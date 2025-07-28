@@ -355,17 +355,50 @@ async fn submit_ethereum_transaction_via_chain_fusion(
         return Err("Chain Fusion not enabled".to_string());
     }
     
-    // In a real implementation, this would use ICP's Chain Fusion
-    // to submit transactions to Ethereum. For now, we'll simulate it.
+    // Validate Ethereum contract address
+    if config.ethereum_contract_address.is_empty() {
+        return Err("Ethereum contract address not configured".to_string());
+    }
+    
+    // Use real ICP Chain Fusion to submit Ethereum transaction
     ic_cdk::println!("Submitting Ethereum transaction via Chain Fusion:");
     ic_cdk::println!("  To: {}", to_address);
     ic_cdk::println!("  Value: {}", value);
     ic_cdk::println!("  Data length: {}", transaction_data.len());
     
-    // Simulate transaction hash
-    let tx_hash = format!("0x{:x}", sha2::Sha256::digest(&transaction_data));
+    // Call ICP Chain Fusion API to submit transaction
+    let evm_canister_id = match config.evm_canister_id {
+        Some(id) => id,
+        None => return Err("EVM canister ID not configured".to_string()),
+    };
     
-    Ok(tx_hash)
+    // Create transaction payload for Chain Fusion
+    let transaction_payload = serde_json::json!({
+        "to": to_address,
+        "value": format!("0x{:x}", value),
+        "data": format!("0x{}", hex::encode(&transaction_data)),
+        "gas": "0x186A0", // 100,000 gas
+        "gasPrice": "0x3B9ACA00", // 1 gwei
+        "nonce": "0x0"
+    });
+    
+    // Submit transaction via Chain Fusion
+    let result = ic_cdk::call::<_, ()>(
+        evm_canister_id,
+        "submit_transaction",
+        (transaction_payload.to_string(),)
+    ).await;
+    
+    match result {
+        Ok(_) => {
+            ic_cdk::println!("Transaction submitted successfully");
+            Ok("Transaction submitted".to_string())
+        },
+        Err(error) => {
+            ic_cdk::println!("Chain Fusion transaction failed: {:?}", error);
+            Err(format!("Chain Fusion call failed: {:?}", error))
+        }
+    }
 }
 
 // Cross-chain message verification

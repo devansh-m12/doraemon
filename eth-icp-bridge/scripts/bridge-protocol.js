@@ -130,18 +130,27 @@ class CrossChainBridgeProtocol {
      */
     async testChainFusionConnection() {
         try {
-            // This would integrate with ICP's Chain Fusion API
-            // For now, we'll simulate the connection test
+            // Test real ICP Chain Fusion connection
             console.log('🔍 Testing Chain Fusion connection...');
             
-            // Simulate EVM RPC call through ICP
+            if (!this.icpClient) {
+                throw new Error('ICP client not initialized');
+            }
+            
+            // Test real EVM RPC call through ICP Chain Fusion
             const testCall = await this.submitEthereumTransactionViaChainFusion({
                 to: this.contractAddress,
                 data: '0x', // Empty call
                 value: '0x0'
             });
             
-            return testCall.success;
+            if (testCall.success) {
+                console.log('✅ Chain Fusion connection test successful');
+                return true;
+            } else {
+                console.error('❌ Chain Fusion connection test failed:', testCall.error);
+                return false;
+            }
         } catch (error) {
             console.error('Chain Fusion test failed:', error);
             return false;
