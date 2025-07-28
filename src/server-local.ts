@@ -27,14 +27,16 @@ const bridge = new LocalDoraemonBridge(bridgeConfig);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
+  const config = bridge.getConfig();
   res.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
     bridge: {
       ethereumNetwork: 'localhost',
       icpNetwork: process.env['ICP_NETWORK'] || 'local',
-      fusionEnabled: false,
-      localMode: true
+      fusionEnabled: config.oneInchApiKey ? true : false,
+      localMode: !config.oneInchApiKey,
+      oneInchConnected: !!config.oneInchApiKey
     }
   });
 });

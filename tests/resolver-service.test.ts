@@ -141,17 +141,27 @@ describe('DoraemonResolverService', () => {
     });
 
     it('should cancel order after timelock expiry', async () => {
-      // Mock time to be after timelock
-      const originalDateNow = Date.now;
-      Date.now = jest.fn(() => (Math.floor(Date.now() / 1000) + 8000) * 1000);
+      // Create order with short timelock for testing
+      const shortTimelock = Math.floor(Date.now() / 1000) + 1; // 1 second timelock
+      
+      const params = {
+        sender: '0x1234567890123456789012345678901234567890',
+        icpRecipient: '0x0987654321098765432109876543210987654321',
+        amount: '1000000000000000000',
+        hashlock: '0x1234567890123456789012345678901234567890123456789012345678901234',
+        timelock: shortTimelock
+      };
 
-      const result = await resolverService.cancelOrder(orderId);
+      const result = await resolverService.createCrossChainOrder(params);
+      const orderId = result.orderId;
 
-      expect(result.success).toBe(true);
-      expect(result.txHash).toBeDefined();
+      // Wait for timelock to expire (2 seconds to be safe)
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
-      // Restore original Date.now
-      Date.now = originalDateNow;
+      const cancelResult = await resolverService.cancelOrder(orderId);
+
+      expect(cancelResult.success).toBe(true);
+      expect(cancelResult.txHash).toBeDefined();
     });
 
     it('should reject cancellation before timelock expiry', async () => {

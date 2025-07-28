@@ -40,6 +40,11 @@ contract DoraemonResolver is ReentrancyGuard, Ownable {
     // Authorized resolvers (1inch Fusion+ resolvers)
     mapping(address => bool) public authorizedResolvers;
     
+    // Real statistics tracking
+    uint256 private _totalOrders;
+    uint256 private _completedOrders;
+    uint256 private _cancelledOrders;
+    
     // Events
     event CrossChainOrderCreated(
         bytes32 indexed orderId,
@@ -185,6 +190,9 @@ contract DoraemonResolver is ReentrancyGuard, Ownable {
         
         usedHashlocks[hashlock] = true;
         
+        // Increment total orders counter
+        _totalOrders++;
+        
         emit CrossChainOrderCreated(
             orderId,
             sender,
@@ -226,6 +234,9 @@ contract DoraemonResolver is ReentrancyGuard, Ownable {
         order.resolvedAt = block.timestamp;
         order.resolver = msg.sender;
         
+        // Increment completed orders counter
+        _completedOrders++;
+        
         // Complete bridge swap
         bridgeContract.claimSwap(orderId, preimage);
         
@@ -252,6 +263,9 @@ contract DoraemonResolver is ReentrancyGuard, Ownable {
         if (block.timestamp < order.timelock) revert("Timelock not expired");
         
         order.cancelled = true;
+        
+        // Increment cancelled orders counter
+        _cancelledOrders++;
         
         emit CrossChainOrderCancelled(
             orderId,
@@ -353,9 +367,11 @@ contract DoraemonResolver is ReentrancyGuard, Ownable {
         uint256 cancelledOrders,
         uint256 pendingOrders
     ) {
-        // This would require additional state tracking
-        // For now, return placeholder values
-        return (0, 0, 0, 0);
+        // Real statistics tracking
+        totalOrders = _totalOrders;
+        completedOrders = _completedOrders;
+        cancelledOrders = _cancelledOrders;
+        pendingOrders = _totalOrders - _completedOrders - _cancelledOrders;
     }
 
     /**
