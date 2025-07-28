@@ -1,11 +1,42 @@
 use candid::{CandidType, Deserialize, Principal};
-// Chain Fusion imports for Phase 3
-use ic_cdk::api::management_canister::ecdsa::{
-    sign_with_ecdsa, EcdsaKeyId, EcdsaPublicKeyArgument, SignWithEcdsaArgument, EcdsaCurve,
-};
 use ic_cdk::{init, query, update};
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
+use sha2::{Digest, Sha256};
+// use serde_json; // Unused for now
+
+// ICP Ledger types for real transfers
+#[derive(CandidType, Deserialize)]
+pub struct Account {
+    pub owner: Principal,
+    pub subaccount: Option<Vec<u8>>,
+}
+
+#[derive(CandidType, Deserialize)]
+pub struct TransferArgs {
+    pub to: Account,
+    pub fee: Option<u64>,
+    pub memo: Option<Vec<u8>>,
+    pub from_subaccount: Option<Vec<u8>>,
+    pub created_at_time: Option<u64>,
+    pub amount: u64,
+}
+
+#[derive(CandidType, Deserialize)]
+pub struct TransferResult {
+    pub block_height: u64,
+    pub transfer: Transfer,
+}
+
+#[derive(CandidType, Deserialize)]
+pub struct Transfer {
+    pub to: Account,
+    pub fee: u64,
+    pub memo: Vec<u8>,
+    pub from_subaccount: Option<Vec<u8>>,
+    pub created_at_time: Option<u64>,
+    pub amount: u64,
+}
 
 // Types for cross-chain swap
 #[derive(CandidType, Deserialize, Clone)]
@@ -18,7 +49,8 @@ pub struct SwapOrder {
     pub completed: bool,
     pub refunded: bool,
     pub created_at: u64,
-    pub cross_chain_id: Option<String>, // Phase 3: Cross-chain order ID
+    pub cross_chain_id: Option<String>,
+    pub transfer_block_height: Option<u64>, // Track actual transfer
 }
 
 #[derive(CandidType, Deserialize)]
@@ -27,7 +59,7 @@ pub struct CreateSwapRequest {
     pub amount: u64,
     pub hashlock: Vec<u8>,
     pub timelock: u64,
-    pub cross_chain_id: Option<String>, // Phase 3: Link to Ethereum order
+    pub cross_chain_id: Option<String>,
 }
 
 #[derive(CandidType, Deserialize)]
@@ -41,13 +73,13 @@ pub struct RefundSwapRequest {
     pub order_id: String,
 }
 
-// Phase 3: Cross-chain message types
-#[derive(CandidType, Deserialize)]
+// Cross-chain message types
+#[derive(CandidType, Deserialize, Clone)]
 pub struct CrossChainMessage {
     pub source_chain: String,
     pub target_chain: String,
     pub order_id: String,
-    pub message_type: String, // "create", "complete", "refund"
+    pub message_type: String,
     pub payload: Vec<u8>,
     pub signature: Option<Vec<u8>>,
     pub timestamp: u64,
@@ -65,18 +97,19 @@ pub struct ChainFusionConfig {
 static mut SWAP_ORDERS: Option<HashMap<String, SwapOrder>> = None;
 static mut USED_HASHLOCKS: Option<HashMap<Vec<u8>, bool>> = None;
 static mut BRIDGE_CONFIG: Option<BridgeConfig> = None;
-// Phase 3: Cross-chain state
 static mut CROSS_CHAIN_MESSAGES: Option<HashMap<String, CrossChainMessage>> = None;
 static mut CHAIN_FUSION_CONFIG: Option<ChainFusionConfig> = None;
+static mut CANISTER_BALANCE: Option<u64> = None; // Track canister balance
 
 #[derive(CandidType, Deserialize, Clone)]
 pub struct BridgeConfig {
-    pub bridge_fee_percentage: u64, // in basis points (0.1% = 10)
+    pub bridge_fee_percentage: u64,
     pub min_swap_amount: u64,
     pub max_swap_amount: u64,
     pub authorized_resolvers: Vec<Principal>,
     pub ethereum_contract_address: String,
-    pub chain_fusion_enabled: bool, // Phase 3: Chain Fusion toggle
+    pub chain_fusion_enabled: bool,
+    pub icp_ledger_canister_id: Principal, // Real ICP ledger canister
 }
 
 impl Default for BridgeConfig {
@@ -84,10 +117,11 @@ impl Default for BridgeConfig {
         Self {
             bridge_fee_percentage: 10, // 0.1%
             min_swap_amount: 1_000_000_000_000_000, // 0.001 ICP in e8s
-            max_swap_amount: 1_000_000_000_000_000_000, // 1 ICP in e8s (reduced from 100)
+            max_swap_amount: 1_000_000_000_000_000_000, // 1 ICP in e8s
             authorized_resolvers: vec![],
             ethereum_contract_address: String::new(),
-            chain_fusion_enabled: false, // Disabled by default
+            chain_fusion_enabled: false,
+            icp_ledger_canister_id: Principal::from_text("ryjl3-tyaaa-aaaaa-aaaba-cai").unwrap(), // Mainnet ICP ledger
         }
     }
 }
@@ -120,7 +154,6 @@ fn get_bridge_config() -> &'static mut BridgeConfig {
     }
 }
 
-// Phase 3: Cross-chain message helpers
 fn get_cross_chain_messages() -> &'static mut HashMap<String, CrossChainMessage> {
     unsafe {
         if CROSS_CHAIN_MESSAGES.is_none() {
@@ -141,6 +174,15 @@ fn get_chain_fusion_config() -> &'static mut ChainFusionConfig {
             });
         }
         CHAIN_FUSION_CONFIG.as_mut().unwrap()
+    }
+}
+
+fn get_canister_balance() -> &'static mut u64 {
+    unsafe {
+        if CANISTER_BALANCE.is_none() {
+            CANISTER_BALANCE = Some(0);
+        }
+        CANISTER_BALANCE.as_mut().unwrap()
     }
 }
 
@@ -173,10 +215,14 @@ fn generate_order_id(
 }
 
 fn compute_hashlock(preimage: &[u8]) -> Vec<u8> {
-    use sha2::{Digest, Sha256};
     let mut hasher = Sha256::new();
     hasher.update(preimage);
     hasher.finalize().to_vec()
+}
+
+fn verify_hashlock(hashlock: &[u8], preimage: &[u8]) -> bool {
+    let computed_hashlock = compute_hashlock(preimage);
+    hashlock == computed_hashlock
 }
 
 fn is_authorized_resolver(caller: &Principal) -> bool {
@@ -184,7 +230,120 @@ fn is_authorized_resolver(caller: &Principal) -> bool {
     config.authorized_resolvers.contains(caller)
 }
 
-// Phase 3: Chain Fusion integration
+// Real ICP transfer implementation
+async fn transfer_icp_to_recipient(recipient: Principal, amount: u64) -> Result<u64, String> {
+    let config = get_bridge_config();
+    
+    // Create transfer account
+    let to_account = Account {
+        owner: recipient,
+        subaccount: None,
+    };
+    
+    // Create transfer args
+    let transfer_args = TransferArgs {
+        to: to_account,
+        fee: Some(10000), // 0.0001 ICP fee
+        memo: Some(format!("Doraemon Bridge Swap").into_bytes()),
+        from_subaccount: None,
+        created_at_time: Some(current_timestamp() * 1_000_000_000), // nanoseconds
+        amount,
+    };
+    
+    // Call ICP ledger canister for transfer
+    let result: Result<(TransferResult,), _> = ic_cdk::call(
+        config.icp_ledger_canister_id,
+        "transfer",
+        (transfer_args,)
+    ).await;
+    
+    match result {
+        Ok((transfer_result,)) => {
+            // Update canister balance
+            let balance = get_canister_balance();
+            if *balance >= amount {
+                *balance -= amount;
+            }
+            
+            ic_cdk::println!("ICP transfer successful: {} e8s to {}", amount, recipient);
+            Ok(transfer_result.block_height)
+        },
+        Err(error) => {
+            ic_cdk::println!("ICP transfer failed: {:?}", error);
+            Err(format!("Transfer failed: {:?}", error))
+        }
+    }
+}
+
+// Real ICP refund implementation
+async fn refund_icp_to_sender(sender: Principal, amount: u64) -> Result<u64, String> {
+    let config = get_bridge_config();
+    
+    // Create transfer account
+    let to_account = Account {
+        owner: sender,
+        subaccount: None,
+    };
+    
+    // Create transfer args
+    let transfer_args = TransferArgs {
+        to: to_account,
+        fee: Some(10000), // 0.0001 ICP fee
+        memo: Some(format!("Doraemon Bridge Refund").into_bytes()),
+        from_subaccount: None,
+        created_at_time: Some(current_timestamp() * 1_000_000_000), // nanoseconds
+        amount,
+    };
+    
+    // Call ICP ledger canister for transfer
+    let result: Result<(TransferResult,), _> = ic_cdk::call(
+        config.icp_ledger_canister_id,
+        "transfer",
+        (transfer_args,)
+    ).await;
+    
+    match result {
+        Ok((transfer_result,)) => {
+            ic_cdk::println!("ICP refund successful: {} e8s to {}", amount, sender);
+            Ok(transfer_result.block_height)
+        },
+        Err(error) => {
+            ic_cdk::println!("ICP refund failed: {:?}", error);
+            Err(format!("Refund failed: {:?}", error))
+        }
+    }
+}
+
+// Check canister balance
+async fn get_icp_balance() -> Result<u64, String> {
+    let config = get_bridge_config();
+    let canister_id = ic_cdk::id();
+    
+    let account = Account {
+        owner: canister_id,
+        subaccount: None,
+    };
+    
+    let result: Result<(u64,), _> = ic_cdk::call(
+        config.icp_ledger_canister_id,
+        "account_balance",
+        (account,)
+    ).await;
+    
+    match result {
+        Ok((balance,)) => {
+            let balance_mut = get_canister_balance();
+            *balance_mut = balance;
+            Ok(balance)
+        },
+        Err(error) => {
+            ic_cdk::println!("Failed to get balance: {:?}", error);
+            Err(format!("Balance check failed: {:?}", error))
+        }
+    }
+}
+
+// Chain Fusion integration for Ethereum interaction
 async fn submit_ethereum_transaction_via_chain_fusion(
     transaction_data: Vec<u8>,
     to_address: String,
@@ -196,32 +355,31 @@ async fn submit_ethereum_transaction_via_chain_fusion(
         return Err("Chain Fusion not enabled".to_string());
     }
     
-    // This would integrate with ICP's Chain Fusion to submit Ethereum transactions
-    // For now, we'll return a placeholder response
-    ic_cdk::println!("📤 Submitting Ethereum transaction via Chain Fusion");
-    ic_cdk::println!("To: {}", to_address);
-    ic_cdk::println!("Value: {}", value);
-    ic_cdk::println!("Data length: {}", transaction_data.len());
+    // In a real implementation, this would use ICP's Chain Fusion
+    // to submit transactions to Ethereum. For now, we'll simulate it.
+    ic_cdk::println!("Submitting Ethereum transaction via Chain Fusion:");
+    ic_cdk::println!("  To: {}", to_address);
+    ic_cdk::println!("  Value: {}", value);
+    ic_cdk::println!("  Data length: {}", transaction_data.len());
     
-    // Simulate successful transaction
-    Ok("0x".to_string() + &hex::encode(&transaction_data[..8]))
+    // Simulate transaction hash
+    let tx_hash = format!("0x{:x}", sha2::Sha256::digest(&transaction_data));
+    
+    Ok(tx_hash)
 }
 
-// Phase 3: Cross-chain message verification
+// Cross-chain message verification
 fn verify_cross_chain_message(message: &CrossChainMessage) -> bool {
-    // Verify timestamp is recent
     let current_time = current_timestamp();
     if current_time < message.timestamp || current_time > message.timestamp + 3600 {
         return false;
     }
     
-    // Verify message type is valid
     let valid_types = vec!["create", "complete", "refund"];
     if !valid_types.contains(&message.message_type.as_str()) {
         return false;
     }
     
-    // Verify chains are valid
     let valid_chains = vec!["ethereum", "icp"];
     if !valid_chains.contains(&message.source_chain.as_str()) || 
        !valid_chains.contains(&message.target_chain.as_str()) {
@@ -260,6 +418,12 @@ pub async fn create_icp_swap(request: CreateSwapRequest) -> Result<String, Strin
         return Err("Hashlock already used".to_string());
     }
     
+    // Check canister balance
+    let balance = get_icp_balance().await?;
+    if balance < request.amount {
+        return Err("Insufficient canister balance".to_string());
+    }
+    
     // Calculate bridge fee
     let bridge_fee = (request.amount * config.bridge_fee_percentage) / 10000;
     let swap_amount = request.amount - bridge_fee;
@@ -274,7 +438,8 @@ pub async fn create_icp_swap(request: CreateSwapRequest) -> Result<String, Strin
         completed: false,
         refunded: false,
         created_at: current_time,
-        cross_chain_id: request.cross_chain_id, // Phase 3: Store cross-chain ID
+        cross_chain_id: request.cross_chain_id,
+        transfer_block_height: None,
     };
     
     let order_id = generate_order_id(
@@ -288,9 +453,9 @@ pub async fn create_icp_swap(request: CreateSwapRequest) -> Result<String, Strin
     // Store the order
     let swap_orders = get_swap_orders();
     swap_orders.insert(order_id.clone(), order);
-    used_hashlocks.insert(request.hashlock, true);
+    used_hashlocks.insert(request.hashlock.clone(), true);
     
-    // Phase 3: Log cross-chain message
+    // Log cross-chain message
     let cross_chain_message = CrossChainMessage {
         source_chain: "icp".to_string(),
         target_chain: "ethereum".to_string(),
@@ -303,6 +468,8 @@ pub async fn create_icp_swap(request: CreateSwapRequest) -> Result<String, Strin
     
     let cross_chain_messages = get_cross_chain_messages();
     cross_chain_messages.insert(order_id.clone(), cross_chain_message);
+    
+    ic_cdk::println!("Created ICP swap order: {} for {} e8s", order_id, swap_amount);
     
     Ok(order_id)
 }
@@ -334,15 +501,18 @@ pub async fn complete_icp_swap(request: CompleteSwapRequest) -> Result<(), Strin
     }
     
     // Verify preimage
-    let computed_hashlock = compute_hashlock(&request.preimage);
-    if order.hashlock != computed_hashlock {
+    if !verify_hashlock(&order.hashlock, &request.preimage) {
         return Err("Invalid preimage".to_string());
     }
     
+    // Perform actual ICP transfer
+    let transfer_result = transfer_icp_to_recipient(order.icp_recipient, order.amount).await?;
+    
     // Mark as completed
     order.completed = true;
+    order.transfer_block_height = Some(transfer_result);
     
-    // Phase 3: Submit completion to Ethereum via Chain Fusion
+    // Submit completion to Ethereum via Chain Fusion
     if get_bridge_config().chain_fusion_enabled {
         let _result = submit_ethereum_transaction_via_chain_fusion(
             request.preimage.clone(),
@@ -351,8 +521,7 @@ pub async fn complete_icp_swap(request: CompleteSwapRequest) -> Result<(), Strin
         ).await;
     }
     
-    // Transfer ICP to recipient (simplified - in real implementation, you'd use ICP ledger)
-    // For now, we just mark it as completed
+    ic_cdk::println!("Completed ICP swap: {} with transfer block {}", request.order_id, transfer_result);
     
     Ok(())
 }
@@ -378,10 +547,14 @@ pub async fn refund_icp_swap(request: RefundSwapRequest) -> Result<(), String> {
         return Err("Timelock not expired".to_string());
     }
     
+    // Perform actual ICP refund
+    let refund_result = refund_icp_to_sender(order.icp_recipient, order.amount).await?;
+    
     // Mark as refunded
     order.refunded = true;
+    order.transfer_block_height = Some(refund_result);
     
-    // Phase 3: Submit refund to Ethereum via Chain Fusion
+    // Submit refund to Ethereum via Chain Fusion
     if get_bridge_config().chain_fusion_enabled {
         let _result = submit_ethereum_transaction_via_chain_fusion(
             request.order_id.as_bytes().to_vec(),
@@ -390,35 +563,29 @@ pub async fn refund_icp_swap(request: RefundSwapRequest) -> Result<(), String> {
         ).await;
     }
     
-    // Refund ICP to caller (simplified - in real implementation, you'd use ICP ledger)
+    ic_cdk::println!("Refunded ICP swap: {} with transfer block {}", request.order_id, refund_result);
     
     Ok(())
 }
 
-// Phase 3: Cross-chain message handling
+// Cross-chain message handling
 #[update]
 pub async fn process_cross_chain_message(message: CrossChainMessage) -> Result<(), String> {
-    // Verify message integrity
     if !verify_cross_chain_message(&message) {
         return Err("Invalid cross-chain message".to_string());
     }
     
-    // Store message
     let cross_chain_messages = get_cross_chain_messages();
     cross_chain_messages.insert(message.order_id.clone(), message.clone());
     
-    // Process based on message type
     match message.message_type.as_str() {
         "create" => {
-            // Handle cross-chain swap creation
             ic_cdk::println!("Processing cross-chain create message: {}", message.order_id);
         },
         "complete" => {
-            // Handle cross-chain swap completion
             ic_cdk::println!("Processing cross-chain complete message: {}", message.order_id);
         },
         "refund" => {
-            // Handle cross-chain swap refund
             ic_cdk::println!("Processing cross-chain refund message: {}", message.order_id);
         },
         _ => return Err("Unknown message type".to_string()),
@@ -446,7 +613,6 @@ pub fn get_bridge_config_query() -> BridgeConfig {
     get_bridge_config().clone()
 }
 
-// Phase 3: Cross-chain message queries
 #[query]
 pub fn get_cross_chain_message(order_id: String) -> Result<CrossChainMessage, String> {
     let cross_chain_messages = get_cross_chain_messages();
@@ -458,6 +624,12 @@ pub fn get_cross_chain_message(order_id: String) -> Result<CrossChainMessage, St
 #[query]
 pub fn get_chain_fusion_status() -> bool {
     get_bridge_config().chain_fusion_enabled
+}
+
+// Real balance query
+#[query]
+pub async fn get_canister_balance_query() -> Result<u64, String> {
+    get_icp_balance().await
 }
 
 // Admin functions
@@ -515,7 +687,6 @@ pub fn set_authorized_resolver(resolver: Principal, authorized: bool) -> Result<
     Ok(())
 }
 
-// Phase 3: Chain Fusion configuration
 #[update]
 pub fn set_chain_fusion_enabled(enabled: bool) -> Result<(), String> {
     let caller = ic_cdk::caller();
@@ -548,6 +719,19 @@ pub fn set_ethereum_contract_address(address: String) -> Result<(), String> {
     Ok(())
 }
 
+#[update]
+pub fn set_icp_ledger_canister_id(canister_id: Principal) -> Result<(), String> {
+    let caller = ic_cdk::caller();
+    if caller != ic_cdk::id() {
+        return Err("Only canister controller can call this".to_string());
+    }
+    
+    let config = get_bridge_config();
+    config.icp_ledger_canister_id = canister_id;
+    
+    Ok(())
+}
+
 // Chain Fusion integration for Ethereum interaction
 #[update]
 pub async fn submit_ethereum_transaction(transaction_data: Vec<u8>) -> Result<String, String> {
@@ -557,7 +741,6 @@ pub async fn submit_ethereum_transaction(transaction_data: Vec<u8>) -> Result<St
         return Err("Chain Fusion not enabled".to_string());
     }
     
-    // Submit transaction via Chain Fusion
     submit_ethereum_transaction_via_chain_fusion(
         transaction_data,
         config.ethereum_contract_address.clone(),
@@ -568,26 +751,37 @@ pub async fn submit_ethereum_transaction(transaction_data: Vec<u8>) -> Result<St
 // Health check and status
 #[query]
 pub fn greet(name: String) -> String {
-    format!("Hello, {}! ICP Bridge is running with Phase 3 Chain Fusion.", name)
+    format!("Hello, {}! ICP Bridge is running with real transfers and Chain Fusion.", name)
 }
 
 #[query]
 pub fn get_canister_status() -> String {
     let config = get_bridge_config();
     if config.chain_fusion_enabled {
-        "ICP Bridge Canister - Active with Chain Fusion"
+        "ICP Bridge Canister - Active with Chain Fusion and Real Transfers".to_string()
     } else {
-        "ICP Bridge Canister - Active"
+        "ICP Bridge Canister - Active with Real Transfers".to_string()
     }
+}
+
+// Get swap statistics
+#[query]
+pub fn get_swap_statistics() -> (u64, u64, u64) {
+    let swap_orders = get_swap_orders();
+    let total_orders = swap_orders.len() as u64;
+    let completed_orders = swap_orders.values().filter(|order| order.completed).count() as u64;
+    let refunded_orders = swap_orders.values().filter(|order| order.refunded).count() as u64;
+    
+    (total_orders, completed_orders, refunded_orders)
 }
 
 // Initialize canister
 #[init]
 fn init() {
-    // Initialize with default configuration
     get_bridge_config();
     get_swap_orders();
     get_used_hashlocks();
     get_cross_chain_messages();
     get_chain_fusion_config();
+    get_canister_balance();
 }

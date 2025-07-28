@@ -193,3 +193,5 @@ temp/
 
 # Local development
 .local/
+
+cache/
