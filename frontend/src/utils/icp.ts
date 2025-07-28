@@ -149,7 +149,7 @@ export const getTransactionHistory = async (
           recipient: principalId,
           sender: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266', // Real Hardhat address
           hashlock: '0x332478b2ad7b1c3e56260c340529a16372a87d3db64c496d651a1ba131d363ab',
-          timelock: new Date(Date.now() + 3600000).toISOString(), // 1 hour from now
+          timelock: new Date(Date.now() + 7200000).toISOString(), // 2 hours from now
           gasUsed: '179,203',
           blockNumber: 12345
         },
@@ -199,7 +199,7 @@ export const getBridgeTransactions = async (
           recipient: '2vxsx-fae', // Real ICP Principal ID
           sender: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266', // Real Hardhat address
           hashlock: '0x332478b2ad7b1c3e56260c340529a16372a87d3db64c496d651a1ba131d363ab',
-          timelock: new Date(Date.now() + 3600000).toISOString(),
+          timelock: new Date(Date.now() + 7200000).toISOString(), // 2 hours from now
           gasUsed: '179,203',
           blockNumber: 12345
         },

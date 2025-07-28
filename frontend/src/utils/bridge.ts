@@ -74,6 +74,21 @@ class BridgeService {
     }
   }
 
+  // Helper function to validate Ethereum address
+  private validateEthereumAddress(address: string): boolean {
+    try {
+      // Check if it's a valid hex address
+      if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
+        return false
+      }
+      // Additional validation using ethers
+      ethers.getAddress(address)
+      return true
+    } catch {
+      return false
+    }
+  }
+
   private getContractABI() {
     // This is a simplified ABI for the EthereumICPBridge contract
     // In a real implementation, you'd load this from the artifacts
@@ -189,10 +204,18 @@ class BridgeService {
     try {
       console.log('🔄 Creating real swap transaction...')
       
+      // Validate Ethereum address to prevent ENS resolution issues
+      if (!this.validateEthereumAddress(params.ethereumSender)) {
+        return {
+          success: false,
+          error: 'Invalid Ethereum address format. Please use a valid hex address.'
+        }
+      }
+      
       // Generate cryptographic materials
       const preimage = ethers.randomBytes(32)
       const hashlock = ethers.keccak256(preimage)
-      const timelock = Math.floor(Date.now() / 1000) + 3600 // 1 hour
+      const timelock = Math.floor(Date.now() / 1000) + 7200 // 2 hours (must be > 1 hour per contract)
       
       // Convert amount to wei
       const swapAmount = ethers.parseEther(params.amount)
@@ -242,7 +265,7 @@ class BridgeService {
       const event = receipt.logs.find((log: any) => {
         try {
           const parsed = this.contract!.interface.parseLog(log)
-          return parsed.name === 'SwapCreated'
+          return parsed?.name === 'SwapCreated'
         } catch {
           return false
         }
@@ -250,31 +273,42 @@ class BridgeService {
       
       if (event) {
         const parsedEvent = this.contract!.interface.parseLog(event)
-        const orderId = parsedEvent.args.orderId
-        
-        console.log('🎉 Swap Created Successfully!')
-        console.log('Order ID:', orderId)
-        
-        return {
-          success: true,
-          orderId: orderId,
-          preimage: preimage,
-          hashlock: hashlock,
-          timelock: timelock,
-          txHash: tx.hash,
-          gasUsed: receipt.gasUsed.toString()
+        if (parsedEvent) {
+          const orderId = parsedEvent.args.orderId
+          
+          console.log('🎉 Swap Created Successfully!')
+          console.log('Order ID:', orderId)
+          
+          return {
+            success: true,
+            orderId: orderId,
+            preimage: ethers.hexlify(preimage),
+            hashlock: hashlock,
+            timelock: timelock,
+            txHash: tx.hash,
+            gasUsed: receipt.gasUsed.toString()
+          }
         }
-      } else {
-        console.log('⚠️ No SwapCreated event found')
-        return {
-          success: false,
-          txHash: tx.hash,
-          error: 'No SwapCreated event found'
-        }
+      }
+      
+      console.log('⚠️ No SwapCreated event found')
+      return {
+        success: false,
+        txHash: tx.hash,
+        error: 'No SwapCreated event found'
       }
       
     } catch (error) {
       console.error('❌ Swap creation failed:', error)
+      
+      // Handle ENS-related errors specifically
+      if (error instanceof Error && error.message.includes('network does not support ENS')) {
+        return {
+          success: false,
+          error: 'ENS resolution is not supported on this network. Please use a valid Ethereum address instead of an ENS name.'
+        }
+      }
+      
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -332,6 +366,163 @@ class BridgeService {
       contractAddress: this.contractAddress,
       walletAddress: this.wallet?.address,
       isLocal: process.env.NEXT_PUBLIC_NETWORK === 'local'
+    }
+  }
+
+  async getRecentTransactions(limit: number = 10): Promise<any[]> {
+    if (!this.isInitialized || !this.contract || !this.provider) {
+      console.warn('Bridge service not initialized, returning empty transactions')
+      return []
+    }
+
+    try {
+      // Get the latest block number
+      const latestBlock = await this.provider.getBlockNumber()
+      
+      // Get events from recent blocks (last 1000 blocks)
+      const fromBlock = Math.max(0, latestBlock - 1000)
+      const toBlock = latestBlock
+      
+      console.log(`🔍 Fetching transactions from blocks ${fromBlock} to ${toBlock}`)
+      
+      // Get SwapCreated events
+      const filter = this.contract.filters.SwapCreated()
+      const events = await this.contract.queryFilter(filter, fromBlock, toBlock)
+      
+      const transactions = await Promise.all(
+        events.slice(-limit).map(async (event) => {
+          try {
+            const block = await this.provider!.getBlock(event.blockNumber)
+            const tx = await this.provider!.getTransaction(event.transactionHash)
+            
+            // Parse the event to get args
+            const parsedEvent = this.contract!.interface.parseLog(event)
+            if (!parsedEvent || parsedEvent.name !== 'SwapCreated') {
+              return null
+            }
+            
+            return {
+              orderId: parsedEvent.args[0], // orderId
+              sender: parsedEvent.args[1], // sender
+              icpRecipient: parsedEvent.args[2], // icpRecipient
+              amount: ethers.formatEther(parsedEvent.args[3]), // amount
+              hashlock: parsedEvent.args[4], // hashlock
+              timelock: new Date(Number(parsedEvent.args[5]) * 1000).toISOString(), // timelock
+              transactionHash: event.transactionHash,
+              blockNumber: event.blockNumber,
+              timestamp: block?.timestamp ? new Date(block.timestamp * 1000).toISOString() : null,
+              gasUsed: tx?.gasLimit?.toString() || '0',
+              status: 'pending' // Default status, could be enhanced with contract queries
+            }
+          } catch (error) {
+            console.error('Error processing transaction:', error)
+            return null
+          }
+        })
+      )
+      
+      // Filter out null results and sort by block number (newest first)
+      return transactions
+        .filter(tx => tx !== null)
+        .sort((a, b) => b.blockNumber - a.blockNumber)
+        .slice(0, limit)
+        
+    } catch (error) {
+      console.error('Failed to get recent transactions:', error)
+      return []
+    }
+  }
+
+  async getContractInfo(): Promise<any> {
+    if (!this.isInitialized || !this.contract) {
+      return null
+    }
+
+    try {
+      // Get basic contract information
+      const contractAddress = this.contractAddress
+      const network = process.env.NEXT_PUBLIC_NETWORK || 'local'
+      
+      // Try to get contract balance
+      let contractBalance = '0'
+      try {
+        if (this.provider) {
+          const balance = await this.provider.getBalance(contractAddress!)
+          contractBalance = ethers.formatEther(balance)
+        }
+      } catch (error) {
+        console.warn('Failed to get contract balance:', error)
+      }
+
+      return {
+        address: contractAddress,
+        network: network,
+        balance: contractBalance,
+        currency: 'ETH',
+        isLocal: network === 'local',
+        lastUpdated: new Date().toISOString()
+      }
+    } catch (error) {
+      console.error('Failed to get contract info:', error)
+      return null
+    }
+  }
+
+  async claimSwap(orderId: string, preimage: string): Promise<SwapResult> {
+    if (!this.isInitialized || !this.contract || !this.wallet) {
+      return {
+        success: false,
+        error: 'Bridge service not initialized. Cannot complete swap.'
+      }
+    }
+
+    try {
+      console.log('🔄 Completing swap with preimage...')
+      console.log('Order ID:', orderId)
+      console.log('Preimage:', preimage)
+      
+      // Convert preimage from hex string to bytes
+      const preimageBytes = ethers.getBytes(preimage)
+      
+      // Estimate gas for claimSwap
+      const gasEstimate = await this.contract.claimSwap.estimateGas(orderId, preimageBytes)
+      
+      console.log('⛽ Estimated Gas:', gasEstimate.toString())
+      
+      // Complete the swap transaction
+      const tx = await this.contract.claimSwap(
+        orderId,
+        preimageBytes,
+        { 
+          gasLimit: gasEstimate * BigInt(120) / BigInt(100) // Add 20% buffer
+        }
+      )
+      
+      console.log('📤 Claim transaction sent!')
+      console.log('Transaction Hash:', tx.hash)
+      
+      // Wait for transaction confirmation
+      console.log('⏳ Waiting for confirmation...')
+      const receipt = await tx.wait()
+      
+      console.log('✅ Swap completed successfully!')
+      console.log('Block Number:', receipt.blockNumber)
+      console.log('Gas Used:', receipt.gasUsed.toString())
+      
+      return {
+        success: true,
+        orderId: orderId,
+        txHash: tx.hash,
+        gasUsed: receipt.gasUsed.toString()
+      }
+      
+    } catch (error) {
+      console.error('❌ Swap completion failed:', error)
+      
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error during swap completion'
+      }
     }
   }
 }

@@ -1,5 +1,6 @@
 const { ethers } = require('ethers');
 const path = require('path');
+const NetworkConfig = require('./network-config');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 /**
@@ -7,6 +8,10 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
  */
 class ContractStateChecker {
     constructor() {
+        // Setup network configuration
+        const networkConfig = new NetworkConfig();
+        networkConfig.setupEnvironment();
+        
         this.provider = new ethers.JsonRpcProvider(process.env.ETHEREUM_RPC_URL);
         this.contractAddress = process.env.ETHEREUM_CONTRACT_ADDRESS;
         
@@ -38,9 +43,10 @@ class ContractStateChecker {
             console.log('💸 Bridge Fee Percentage:', bridgeFeePercentage.toString(), 'basis points (0.1%)');
             
             // Check wallet balance
-            const walletAddress = '0xd38A013fD3A18Bd148b45Cfaf6A1BBb77EC647B9';
+            const walletAddress = process.env.ETHEREUM_WALLET_ADDRESS;
             const balance = await this.provider.getBalance(walletAddress);
             console.log('💳 Wallet Balance:', ethers.formatEther(balance), 'ETH');
+            console.log('💳 Wallet Address:', walletAddress);
             
             // Calculate if we can afford minimum swap + gas
             const gasEstimate = await this.contract.createSwap.estimateGas(
@@ -70,7 +76,6 @@ class ContractStateChecker {
             
             console.log('');
             console.log('🔗 Contract Links:');
-            console.log('Etherscan:', `https://sepolia.etherscan.io/address/${this.contractAddress}`);
             console.log('Contract Address:', this.contractAddress);
             
         } catch (error) {

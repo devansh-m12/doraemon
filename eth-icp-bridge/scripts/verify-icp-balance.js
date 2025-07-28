@@ -3,6 +3,7 @@
 const { exec } = require('child_process');
 const path = require('path');
 const { ethers } = require('ethers');
+const NetworkConfig = require('./network-config');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 /**
@@ -11,8 +12,12 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
  */
 class ICPBalanceVerifier {
     constructor() {
+        // Setup network configuration
+        const networkConfig = new NetworkConfig();
+        networkConfig.setupEnvironment();
+        
         this.canisterId = process.env.ICP_CANISTER_ID || 'rrkah-fqaaa-aaaaa-aaaaq-cai';
-        this.network = process.env.ICP_NETWORK || 'playground';
+        this.network = process.env.NETWORK || 'local'; // Use local network
         this.ethereumProvider = null;
         this.ethereumContract = null;
         
@@ -58,11 +63,11 @@ class ICPBalanceVerifier {
         try {
             // Check canister status
             console.log('🔍 Checking canister status...');
-            await this.runDFXCommand(`dfx canister --${this.network} status ${this.canisterId}`);
+            await this.runDFXCommand(`dfx canister --network=local status ${this.canisterId}`);
             
             // Check canister info
             console.log('\n📋 Canister info...');
-            await this.runDFXCommand(`dfx canister --${this.network} info ${this.canisterId}`);
+            await this.runDFXCommand(`dfx canister --network=local info ${this.canisterId}`);
             
             return true;
         } catch (error) {
@@ -81,7 +86,7 @@ class ICPBalanceVerifier {
         try {
             // Try to get ICP balance from canister
             console.log('🔍 Checking ICP balance...');
-            await this.runDFXCommand(`dfx canister --${this.network} call ${this.canisterId} get_balance`);
+            await this.runDFXCommand(`dfx canister --network=local call ${this.canisterId} get_balance`);
             
             return true;
         } catch (error) {
@@ -107,7 +112,7 @@ class ICPBalanceVerifier {
         try {
             // Try to get all swap orders
             console.log('🔍 Checking all swap orders...');
-            await this.runDFXCommand(`dfx canister --${this.network} call ${this.canisterId} get_all_swaps`);
+            await this.runDFXCommand(`dfx canister --network=local call ${this.canisterId} get_all_swaps`);
             
             return true;
         } catch (error) {
@@ -133,7 +138,7 @@ class ICPBalanceVerifier {
         
         try {
             console.log(`🔍 Checking swap order: ${orderId}`);
-            await this.runDFXCommand(`dfx canister --${this.network} call ${this.canisterId} get_swap_order '("${orderId}")'`);
+            await this.runDFXCommand(`dfx canister --network=local call ${this.canisterId} get_swap_order '("${orderId}")'`);
             
             return true;
         } catch (error) {

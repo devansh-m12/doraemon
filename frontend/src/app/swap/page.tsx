@@ -104,15 +104,22 @@ export default function SwapPage() {
     try {
       console.log('🔄 Creating real swap transaction...')
       
-      const swapParams: SwapParams = {
-        ethereumSender: ethereumAccount,
-        icpRecipient: finalIcpAccount,
-        amount: amount
-      }
+      // Use the API route to create the swap
+      const response = await fetch('/api/swap', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ethereumSender: ethereumAccount,
+          icpRecipient: finalIcpAccount,
+          amount: amount
+        })
+      })
 
-      const result: SwapResult = await bridgeService.createSwap(swapParams)
+      const result = await response.json()
       
-      if (result.success && result.orderId) {
+      if (response.ok && result.success) {
         // Create swap state from real transaction result
         const newSwap: SwapState = {
           id: result.orderId,

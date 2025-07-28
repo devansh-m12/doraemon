@@ -1,5 +1,6 @@
 const { exec } = require('child_process');
 const path = require('path');
+const NetworkConfig = require('./network-config');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 /**
@@ -7,8 +8,12 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
  */
 class ICPCanisterChecker {
     constructor() {
+        // Setup network configuration
+        const networkConfig = new NetworkConfig();
+        networkConfig.setupEnvironment();
+        
         this.canisterId = process.env.ICP_CANISTER_ID;
-        this.network = 'playground'; // Using playground network
+        this.network = process.env.NETWORK || 'local'; // Use local network
     }
 
     async checkCanisterStatus() {
@@ -24,17 +29,17 @@ class ICPCanisterChecker {
         try {
             // Test basic functionality
             console.log('🧪 Testing Basic Functionality:');
-            await this.runDFXCommand(`dfx canister --${this.network} call ${this.canisterId} greet '("Test")'`);
+            await this.runDFXCommand(`dfx canister --network=local call ${this.canisterId} greet '("Test")'`);
             
             // Check canister status
             console.log('');
             console.log('📊 Canister Status:');
-            await this.runDFXCommand(`dfx canister --${this.network} call ${this.canisterId} get_canister_status`);
+            await this.runDFXCommand(`dfx canister --network=local call ${this.canisterId} get_canister_status`);
             
             // Check bridge configuration
             console.log('');
             console.log('⚙️ Bridge Configuration:');
-            await this.runDFXCommand(`dfx canister --${this.network} call ${this.canisterId} get_bridge_config_query`);
+            await this.runDFXCommand(`dfx canister --network=local call ${this.canisterId} get_bridge_config_query`);
             
         } catch (error) {
             console.error('❌ Error checking canister:', error.message);
@@ -54,7 +59,7 @@ class ICPCanisterChecker {
             
             // Try to get a specific swap order (this will fail if none exist, which is expected)
             console.log('Trying to get swap order with ID "test"...');
-            await this.runDFXCommand(`dfx canister --${this.network} call ${this.canisterId} get_swap_order '("test")'`);
+            await this.runDFXCommand(`dfx canister --network=local call ${this.canisterId} get_swap_order '("test")'`);
             
         } catch (error) {
             console.log('⚠️ Expected: No swap orders exist yet');
@@ -88,6 +93,10 @@ class ICPCanisterChecker {
             const provider = new ethers.JsonRpcProvider(process.env.ETHEREUM_RPC_URL);
             const contractAddress = process.env.ETHEREUM_CONTRACT_ADDRESS;
             
+            if (!contractAddress) {
+                throw new Error('Contract address not configured');
+            }
+            
             // Load contract ABI
             const contractABI = require('../ethereum-contracts/artifacts/contracts/EthereumICPBridge.sol/EthereumICPBridge.json').abi;
             const contract = new ethers.Contract(contractAddress, contractABI, provider);
@@ -98,25 +107,26 @@ class ICPCanisterChecker {
             // Get recent events
             console.log('');
             console.log('📋 Recent Swap Events:');
-            const currentBlock = await provider.getBlockNumber();
-            const fromBlock = currentBlock - 1000; // Last 1000 blocks
             
-            const events = await contract.queryFilter('SwapCreated', fromBlock, currentBlock);
+            // Get the latest block number
+            const latestBlock = await provider.getBlockNumber();
+            console.log('Latest Block:', latestBlock);
+            
+            // Get SwapCreated events from the last 10 blocks
+            const fromBlock = Math.max(0, latestBlock - 10);
+            const events = await contract.queryFilter('SwapCreated', fromBlock, latestBlock);
             
             if (events.length > 0) {
-                console.log(`Found ${events.length} recent swap events:`);
+                console.log('✅ Found', events.length, 'swap events:');
                 events.forEach((event, index) => {
-                    console.log(`\n${index + 1}. Swap Event:`);
+                    console.log(`Event ${index + 1}:`);
                     console.log('  Order ID:', event.args.orderId);
                     console.log('  Sender:', event.args.sender);
                     console.log('  Amount:', ethers.formatEther(event.args.amount), 'ETH');
                     console.log('  Hashlock:', event.args.hashlock);
-                    console.log('  Timelock:', new Date(event.args.timelock * 1000).toISOString());
-                    console.log('  Transaction:', event.transactionHash);
-                    console.log('  Etherscan:', `https://sepolia.etherscan.io/tx/${event.transactionHash}`);
                 });
             } else {
-                console.log('No recent swap events found');
+                console.log('ℹ️ No recent swap events found');
             }
             
         } catch (error) {
@@ -137,8 +147,8 @@ class ICPCanisterChecker {
         console.log('✅ Check complete!');
         console.log('');
         console.log('🔗 Useful Links:');
-        console.log('ICP Canister UI:', `https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id=${this.canisterId}`);
-        console.log('Etherscan Contract:', `https://sepolia.etherscan.io/address/${process.env.ETHEREUM_CONTRACT_ADDRESS}`);
+        console.log('ICP Canister UI: https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id=' + this.canisterId);
+        console.log('Etherscan Contract: https://sepolia.etherscan.io/address/' + process.env.ETHEREUM_CONTRACT_ADDRESS);
     }
 }
 

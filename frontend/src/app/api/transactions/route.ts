@@ -1,19 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getBridgeTransactions, getTransactionHistory } from '@/utils/icp'
+import { bridgeService } from '@/utils/bridge'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
-  const principalId = searchParams.get('principal')
-  const network = searchParams.get('network') || 'mainnet'
-  const type = searchParams.get('type') || 'bridge' // 'bridge' or 'account'
+  const type = searchParams.get('type') || 'bridge' // 'bridge' or 'recent'
 
   try {
     let transactions
 
-    if (type === 'account' && principalId) {
-      transactions = await getTransactionHistory(principalId, network as 'mainnet' | 'testnet')
+    if (type === 'recent') {
+      // Get real recent transactions from the bridge contract
+      transactions = await bridgeService.getRecentTransactions(20)
     } else {
-      transactions = await getBridgeTransactions(network as 'mainnet' | 'testnet')
+      // Get bridge transactions (this would be from ICP canister in a full implementation)
+      // For now, we'll use the bridge service recent transactions
+      transactions = await bridgeService.getRecentTransactions(20)
     }
 
     return NextResponse.json(transactions)

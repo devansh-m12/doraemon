@@ -20,7 +20,13 @@ class NetworkConfig {
                 contractAddress: process.env.LOCAL_CONTRACT_ADDRESS,
                 walletAddress: process.env.LOCAL_WALLET_ADDRESS,
                 chainId: 1337,
-                networkName: 'Local Hardhat Network'
+                networkName: 'Local Hardhat Network',
+                RPC_URL: 'LOCAL_RPC_URL',
+                PRIVATE_KEY: 'LOCAL_PRIVATE_KEY',
+                CONTRACT_ADDRESS: 'LOCAL_CONTRACT_ADDRESS',
+                WALLET_ADDRESS: 'LOCAL_WALLET_ADDRESS',
+                CHAIN_ID: 1337,
+                NETWORK_NAME: 'Local Hardhat Network'
             },
             sepolia: {
                 rpcUrl: process.env.SEPOLIA_RPC_URL,
@@ -28,11 +34,44 @@ class NetworkConfig {
                 contractAddress: process.env.SEPOLIA_CONTRACT_ADDRESS,
                 walletAddress: process.env.SEPOLIA_WALLET_ADDRESS,
                 chainId: 11155111,
-                networkName: 'Sepolia Testnet'
+                networkName: 'Sepolia Testnet',
+                RPC_URL: 'SEPOLIA_RPC_URL',
+                PRIVATE_KEY: 'SEPOLIA_PRIVATE_KEY',
+                CONTRACT_ADDRESS: 'SEPOLIA_CONTRACT_ADDRESS',
+                WALLET_ADDRESS: 'SEPOLIA_WALLET_ADDRESS',
+                CHAIN_ID: 11155111,
+                NETWORK_NAME: 'Sepolia Testnet'
             }
         };
 
         return configs[this.network] || configs.local;
+    }
+
+    getCurrentNetwork() {
+        return this.network;
+    }
+
+    getNetworkConfig(network) {
+        const configs = {
+            local: {
+                RPC_URL: 'LOCAL_RPC_URL',
+                PRIVATE_KEY: 'LOCAL_PRIVATE_KEY',
+                CONTRACT_ADDRESS: 'LOCAL_CONTRACT_ADDRESS',
+                WALLET_ADDRESS: 'LOCAL_WALLET_ADDRESS',
+                CHAIN_ID: 1337,
+                NETWORK_NAME: 'Local Hardhat Network'
+            },
+            sepolia: {
+                RPC_URL: 'SEPOLIA_RPC_URL',
+                PRIVATE_KEY: 'SEPOLIA_PRIVATE_KEY',
+                CONTRACT_ADDRESS: 'SEPOLIA_CONTRACT_ADDRESS',
+                WALLET_ADDRESS: 'SEPOLIA_WALLET_ADDRESS',
+                CHAIN_ID: 11155111,
+                NETWORK_NAME: 'Sepolia Testnet'
+            }
+        };
+
+        return configs[network] || configs.local;
     }
 
     getEnvironmentVariables() {

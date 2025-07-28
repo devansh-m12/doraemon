@@ -3,20 +3,20 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Search, Filter, ArrowLeft, ExternalLink, Copy, CheckCircle, Clock, XCircle, AlertCircle } from 'lucide-react'
-import { getBridgeTransactions, checkNetworkStatus } from '@/utils/icp'
+import { bridgeService } from '@/utils/bridge'
 
 interface Transaction {
-  id: string
-  type: 'Swap Created' | 'Swap Completed' | 'Swap Refunded' | 'Balance Transfer'
-  amount: string
-  status: 'Pending' | 'Completed' | 'Refunded' | 'Failed'
-  timestamp: string
-  recipient: string
+  orderId: string
   sender: string
-  hashlock?: string
-  timelock?: string
-  gasUsed?: string
-  blockNumber?: number
+  icpRecipient: string
+  amount: string
+  hashlock: string
+  timelock: string
+  transactionHash: string
+  blockNumber: number
+  timestamp: string
+  gasUsed: string
+  status: string
 }
 
 export default function ExplorerPage() {
@@ -24,22 +24,23 @@ export default function ExplorerPage() {
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
-  const [networkStatus, setNetworkStatus] = useState<boolean>(false)
+  const [bridgeStatus, setBridgeStatus] = useState<boolean>(false)
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
 
-  // Load transactions and check network status on component mount
+  // Load transactions and check bridge status on component mount
   useEffect(() => {
     const loadData = async () => {
       try {
-        // Check network status
-        const status = await checkNetworkStatus('local')
-        setNetworkStatus(status)
+        // Check bridge service status
+        const isReady = bridgeService.isReady()
+        setBridgeStatus(isReady)
 
-        if (status) {
-          // Load real transactions from bridge
-          const bridgeTransactions = await getBridgeTransactions('local')
-          setTransactions(bridgeTransactions)
+        if (isReady) {
+          // Load real transactions from bridge service
+          const recentTransactions = await bridgeService.getRecentTransactions(50)
+          const validTransactions = recentTransactions.filter(tx => tx !== null) as Transaction[]
+          setTransactions(validTransactions)
         }
       } catch (error) {
         console.error('Failed to load transactions:', error)
@@ -52,10 +53,25 @@ export default function ExplorerPage() {
   }, [])
 
   const filteredTransactions = transactions.filter(tx => {
-    const matchesSearch = tx.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         tx.recipient.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         tx.sender.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesFilter = filterStatus === 'all' || tx.status === filterStatus
+    const matchesSearch = tx.transactionHash.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         tx.orderId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         tx.sender?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         tx.icpRecipient?.toLowerCase().includes(searchTerm.toLowerCase())
+    
+    const getStatus = (status: string) => {
+      switch (status) {
+        case 'completed':
+          return 'Completed'
+        case 'pending':
+          return 'Pending'
+        case 'refunded':
+          return 'Refunded'
+        default:
+          return 'Unknown'
+      }
+    }
+    
+    const matchesFilter = filterStatus === 'all' || getStatus(tx.status) === filterStatus
     return matchesSearch && matchesFilter
   })
 
@@ -71,14 +87,12 @@ export default function ExplorerPage() {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'Completed':
+      case 'completed':
         return <CheckCircle className="h-5 w-5 text-green-500" />
-      case 'Pending':
+      case 'pending':
         return <Clock className="h-5 w-5 text-yellow-500" />
-      case 'Refunded':
+      case 'refunded':
         return <XCircle className="h-5 w-5 text-red-500" />
-      case 'Failed':
-        return <AlertCircle className="h-5 w-5 text-red-500" />
       default:
         return <Clock className="h-5 w-5 text-gray-500" />
     }
@@ -86,25 +100,38 @@ export default function ExplorerPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'Completed':
+      case 'completed':
         return 'bg-green-100 text-green-800'
-      case 'Pending':
+      case 'pending':
         return 'bg-yellow-100 text-yellow-800'
-      case 'Refunded':
-        return 'bg-red-100 text-red-800'
-      case 'Failed':
+      case 'refunded':
         return 'bg-red-100 text-red-800'
       default:
         return 'bg-gray-100 text-gray-800'
     }
   }
 
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return 'Completed'
+      case 'pending':
+        return 'Pending'
+      case 'refunded':
+        return 'Refunded'
+      default:
+        return 'Unknown'
+    }
+  }
+
+
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading transactions...</p>
+          <p className="text-gray-600">Loading real transactions...</p>
         </div>
       </div>
     )
@@ -121,7 +148,7 @@ export default function ExplorerPage() {
                 <ArrowLeft className="h-6 w-6 text-gray-600 hover:text-gray-900" />
               </Link>
               <div className="flex-shrink-0">
-                <h1 className="text-2xl font-bold text-gray-900">Transaction Explorer</h1>
+                <h1 className="text-2xl font-bold text-gray-900">Real Transaction Explorer</h1>
               </div>
             </div>
             <nav className="hidden md:flex space-x-8">
@@ -144,13 +171,13 @@ export default function ExplorerPage() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        {/* Network Status */}
+        {/* Bridge Status */}
         <div className="mb-6">
           <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-            networkStatus ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+            bridgeStatus ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
           }`}>
-            <div className={`w-2 h-2 rounded-full mr-2 ${networkStatus ? 'bg-green-500' : 'bg-red-500'}`}></div>
-            {networkStatus ? 'ICP Local Network Connected' : 'ICP Local Network Disconnected'}
+            <div className={`w-2 h-2 rounded-full mr-2 ${bridgeStatus ? 'bg-green-500' : 'bg-red-500'}`}></div>
+            {bridgeStatus ? 'Bridge Service Connected' : 'Bridge Service Disconnected'}
           </div>
         </div>
 
@@ -162,7 +189,7 @@ export default function ExplorerPage() {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search by transaction ID, sender, or recipient..."
+                  placeholder="Search by transaction hash, order ID, or addresses..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -181,14 +208,13 @@ export default function ExplorerPage() {
                   <option value="Pending">Pending</option>
                   <option value="Completed">Completed</option>
                   <option value="Refunded">Refunded</option>
-                  <option value="Failed">Failed</option>
                 </select>
               </div>
             </div>
           </div>
         </div>
 
-        {!networkStatus && (
+        {!bridgeStatus && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
             <div className="flex">
               <div className="flex-shrink-0">
@@ -196,11 +222,11 @@ export default function ExplorerPage() {
               </div>
               <div className="ml-3">
                 <h3 className="text-sm font-medium text-yellow-800">
-                  ICP Local Network Not Connected
+                  Bridge Service Not Connected
                 </h3>
                 <div className="mt-2 text-sm text-yellow-700">
-                  <p>Please start the ICP local network to view real transactions.</p>
-                  <p className="mt-1">Run: <code className="bg-yellow-100 px-1 py-0.5 rounded">dfx start --clean --background</code></p>
+                  <p>Please configure your environment variables to view real transactions.</p>
+                  <p className="mt-1">Required: NEXT_PUBLIC_NETWORK, RPC_URL, PRIVATE_KEY, CONTRACT_ADDRESS</p>
                 </div>
               </div>
             </div>
@@ -213,17 +239,17 @@ export default function ExplorerPage() {
             <div className="bg-white rounded-lg shadow-sm">
               <div className="px-6 py-4 border-b border-gray-200">
                 <h3 className="text-lg font-medium text-gray-900">
-                  Transactions ({filteredTransactions.length})
+                  Real Transactions ({filteredTransactions.length})
                 </h3>
               </div>
               <div className="divide-y divide-gray-200">
                 {filteredTransactions.length > 0 ? (
                   filteredTransactions.map((tx) => (
                     <div
-                      key={tx.id}
+                      key={tx.transactionHash}
                       onClick={() => setSelectedTx(tx)}
                       className={`px-6 py-4 cursor-pointer hover:bg-gray-50 transition-colors ${
-                        selectedTx?.id === tx.id ? 'bg-blue-50 border-l-4 border-blue-500' : ''
+                        selectedTx?.transactionHash === tx.transactionHash ? 'bg-blue-50 border-l-4 border-blue-500' : ''
                       }`}
                     >
                       <div className="flex items-center justify-between">
@@ -232,25 +258,25 @@ export default function ExplorerPage() {
                             {getStatusIcon(tx.status)}
                           </div>
                           <div className="ml-4">
-                            <p className="text-sm font-medium text-gray-900">{tx.type}</p>
-                            <p className="text-sm text-gray-500">ID: {tx.id.slice(0, 16)}...</p>
+                            <p className="text-sm font-medium text-gray-900">Swap</p>
+                            <p className="text-sm text-gray-500">Hash: {tx.transactionHash.slice(0, 16)}...</p>
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm font-medium text-gray-900">{tx.amount}</p>
+                          <p className="text-sm font-medium text-gray-900">{tx.amount} ETH</p>
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(tx.status)}`}>
-                            {tx.status}
+                            {getStatusText(tx.status)}
                           </span>
                         </div>
                       </div>
                       <div className="mt-2 text-sm text-gray-500">
-                        {new Date(tx.timestamp).toLocaleString()}
+                        Block: {tx.blockNumber} | {new Date(tx.timestamp).toLocaleString()}
                       </div>
                     </div>
                   ))
                 ) : (
                   <div className="px-6 py-8 text-center text-gray-500">
-                    <p>{networkStatus ? 'No transactions found matching your search criteria.' : 'No transactions available. Please connect to the local network.'}</p>
+                    <p>{bridgeStatus ? 'No transactions found matching your search criteria.' : 'No transactions available. Please configure the bridge service.'}</p>
                   </div>
                 )}
               </div>
@@ -266,28 +292,45 @@ export default function ExplorerPage() {
               {selectedTx ? (
                 <div className="p-6 space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Transaction ID</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Transaction Hash</label>
                     <div className="flex items-center space-x-2">
                       <code className="text-sm bg-gray-100 px-2 py-1 rounded flex-1">
-                        {selectedTx.id}
+                        {selectedTx.transactionHash}
                       </code>
                       <button
-                        onClick={() => copyToClipboard(selectedTx.id, 'id')}
+                        onClick={() => copyToClipboard(selectedTx.transactionHash, 'hash')}
                         className="p-1 hover:bg-gray-200 rounded"
                       >
-                        {copied === 'id' ? <CheckCircle className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4 text-gray-500" />}
+                        {copied === 'hash' ? <CheckCircle className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4 text-gray-500" />}
                       </button>
                     </div>
                   </div>
 
+                  {selectedTx.orderId && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Order ID</label>
+                      <div className="flex items-center space-x-2">
+                        <code className="text-sm bg-gray-100 px-2 py-1 rounded flex-1">
+                          {selectedTx.orderId}
+                        </code>
+                        <button
+                          onClick={() => copyToClipboard(selectedTx.orderId!, 'orderId')}
+                          className="p-1 hover:bg-gray-200 rounded"
+                        >
+                          {copied === 'orderId' ? <CheckCircle className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4 text-gray-500" />}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-                    <p className="text-sm text-gray-900">{selectedTx.type}</p>
+                    <p className="text-sm text-gray-900">Swap</p>
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
-                    <p className="text-sm text-gray-900">{selectedTx.amount}</p>
+                    <p className="text-sm text-gray-900">{selectedTx.amount} ETH</p>
                   </div>
 
                   <div>
@@ -295,9 +338,14 @@ export default function ExplorerPage() {
                     <div className="flex items-center space-x-2">
                       {getStatusIcon(selectedTx.status)}
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(selectedTx.status)}`}>
-                        {selectedTx.status}
+                        {getStatusText(selectedTx.status)}
                       </span>
                     </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Block Number</label>
+                    <p className="text-sm text-gray-900">{selectedTx.blockNumber}</p>
                   </div>
 
                   <div>
@@ -305,35 +353,39 @@ export default function ExplorerPage() {
                     <p className="text-sm text-gray-900">{new Date(selectedTx.timestamp).toLocaleString()}</p>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Sender</label>
-                    <div className="flex items-center space-x-2">
-                      <code className="text-sm bg-gray-100 px-2 py-1 rounded flex-1">
-                        {selectedTx.sender}
-                      </code>
-                      <button
-                        onClick={() => copyToClipboard(selectedTx.sender, 'sender')}
-                        className="p-1 hover:bg-gray-200 rounded"
-                      >
-                        {copied === 'sender' ? <CheckCircle className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4 text-gray-500" />}
-                      </button>
+                  {selectedTx.sender && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Sender</label>
+                      <div className="flex items-center space-x-2">
+                        <code className="text-sm bg-gray-100 px-2 py-1 rounded flex-1">
+                          {selectedTx.sender}
+                        </code>
+                        <button
+                          onClick={() => copyToClipboard(selectedTx.sender!, 'sender')}
+                          className="p-1 hover:bg-gray-200 rounded"
+                        >
+                          {copied === 'sender' ? <CheckCircle className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4 text-gray-500" />}
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  )}
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Recipient</label>
-                    <div className="flex items-center space-x-2">
-                      <code className="text-sm bg-gray-100 px-2 py-1 rounded flex-1">
-                        {selectedTx.recipient}
-                      </code>
-                      <button
-                        onClick={() => copyToClipboard(selectedTx.recipient, 'recipient')}
-                        className="p-1 hover:bg-gray-200 rounded"
-                      >
-                        {copied === 'recipient' ? <CheckCircle className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4 text-gray-500" />}
-                      </button>
+                  {selectedTx.icpRecipient && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">ICP Recipient</label>
+                      <div className="flex items-center space-x-2">
+                        <code className="text-sm bg-gray-100 px-2 py-1 rounded flex-1">
+                          {selectedTx.icpRecipient}
+                        </code>
+                        <button
+                          onClick={() => copyToClipboard(selectedTx.icpRecipient!, 'icpRecipient')}
+                          className="p-1 hover:bg-gray-200 rounded"
+                        >
+                          {copied === 'icpRecipient' ? <CheckCircle className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4 text-gray-500" />}
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   {selectedTx.hashlock && (
                     <div>
@@ -366,21 +418,14 @@ export default function ExplorerPage() {
                     </div>
                   )}
 
-                  {selectedTx.blockNumber && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Block Number</label>
-                      <p className="text-sm text-gray-900">{selectedTx.blockNumber}</p>
-                    </div>
-                  )}
-
                   <div className="pt-4">
                     <a
-                      href={`https://dashboard.internetcomputer.org/transaction/${selectedTx.id}`}
+                      href={`https://sepolia.etherscan.io/tx/${selectedTx.transactionHash}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center text-sm font-medium text-blue-600 hover:text-blue-500"
                     >
-                      View on ICP Dashboard
+                      View on Etherscan
                       <ExternalLink className="ml-1 h-4 w-4" />
                     </a>
                   </div>
