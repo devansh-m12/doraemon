@@ -23,6 +23,9 @@ export default function Home() {
               <Link href="/balance" className="text-gray-500 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">
                 Balance Checker
               </Link>
+              <Link href="/swap" className="text-gray-500 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">
+                Swap
+              </Link>
             </nav>
           </div>
         </div>
@@ -47,6 +50,10 @@ export default function Home() {
               <Link href="/balance" className="inline-flex items-center px-6 py-3 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
                 <Wallet className="mr-2 h-5 w-5" />
                 Check Balance
+              </Link>
+              <Link href="/swap" className="inline-flex items-center px-6 py-3 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                <ArrowRight className="mr-2 h-5 w-5" />
+                Create Swap
               </Link>
             </div>
           </div>

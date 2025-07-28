@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Search, Filter, ArrowLeft, ExternalLink, Copy, CheckCircle, Clock, XCircle, AlertCircle } from 'lucide-react'
+import { getBridgeTransactions, checkNetworkStatus } from '@/utils/icp'
 
 interface Transaction {
   id: string
@@ -21,57 +22,34 @@ interface Transaction {
 export default function ExplorerPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState<string>('all')
-  const [transactions, setTransactions] = useState<Transaction[]>([
-    {
-      id: '0x235dfe7fd1b68dedf148ca616fae70df5f7a6570a4b42cff55534a3dbe92ffae',
-      type: 'Swap Created',
-      amount: '0.001 ETH',
-      status: 'Pending',
-      timestamp: '2025-07-28T08:41:57.000Z',
-      recipient: '0x94cf75948a5d11686c7cff96ce35e4be1eb9baecfed191ad06122d49398f80c9',
-      sender: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266',
-      hashlock: '0x332478b2ad7b1c3e56260c340529a16372a87d3db64c496d651a1ba131d363ab',
-      timelock: '2025-07-28T08:41:57.000Z',
-      gasUsed: '179,203',
-      blockNumber: 12345
-    },
-    {
-      id: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
-      type: 'Swap Completed',
-      amount: '0.005 ETH',
-      status: 'Completed',
-      timestamp: '2025-07-28T07:30:15.000Z',
-      recipient: '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
-      sender: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
-      gasUsed: '156,789',
-      blockNumber: 12344
-    },
-    {
-      id: '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
-      type: 'Swap Refunded',
-      amount: '0.002 ETH',
-      status: 'Refunded',
-      timestamp: '2025-07-28T06:15:42.000Z',
-      recipient: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
-      sender: '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
-      gasUsed: '98,432',
-      blockNumber: 12343
-    },
-    {
-      id: '0x9876543210fedcba9876543210fedcba9876543210fedcba9876543210fedcba',
-      type: 'Balance Transfer',
-      amount: '0.010 ETH',
-      status: 'Completed',
-      timestamp: '2025-07-28T05:45:20.000Z',
-      recipient: '0xfedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210',
-      sender: '0x9876543210fedcba9876543210fedcba9876543210fedcba9876543210fedcba',
-      gasUsed: '210,567',
-      blockNumber: 12342
-    }
-  ])
-
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [loading, setLoading] = useState(true)
+  const [networkStatus, setNetworkStatus] = useState<boolean>(false)
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
+
+  // Load transactions and check network status on component mount
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        // Check network status
+        const status = await checkNetworkStatus('local')
+        setNetworkStatus(status)
+
+        if (status) {
+          // Load real transactions from bridge
+          const bridgeTransactions = await getBridgeTransactions('local')
+          setTransactions(bridgeTransactions)
+        }
+      } catch (error) {
+        console.error('Failed to load transactions:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadData()
+  }, [])
 
   const filteredTransactions = transactions.filter(tx => {
     const matchesSearch = tx.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -121,6 +99,17 @@ export default function ExplorerPage() {
     }
   }
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading transactions...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       {/* Header */}
@@ -145,6 +134,9 @@ export default function ExplorerPage() {
               <Link href="/balance" className="text-gray-500 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">
                 Balance Checker
               </Link>
+              <Link href="/swap" className="text-gray-500 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">
+                Swap
+              </Link>
             </nav>
           </div>
         </div>
@@ -152,6 +144,16 @@ export default function ExplorerPage() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        {/* Network Status */}
+        <div className="mb-6">
+          <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+            networkStatus ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+          }`}>
+            <div className={`w-2 h-2 rounded-full mr-2 ${networkStatus ? 'bg-green-500' : 'bg-red-500'}`}></div>
+            {networkStatus ? 'ICP Local Network Connected' : 'ICP Local Network Disconnected'}
+          </div>
+        </div>
+
         {/* Search and Filter */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <div className="flex flex-col md:flex-row gap-4">
@@ -186,6 +188,25 @@ export default function ExplorerPage() {
           </div>
         </div>
 
+        {!networkStatus && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <AlertCircle className="h-5 w-5 text-yellow-400" />
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-yellow-800">
+                  ICP Local Network Not Connected
+                </h3>
+                <div className="mt-2 text-sm text-yellow-700">
+                  <p>Please start the ICP local network to view real transactions.</p>
+                  <p className="mt-1">Run: <code className="bg-yellow-100 px-1 py-0.5 rounded">dfx start --clean --background</code></p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Transaction List */}
           <div className="lg:col-span-2">
@@ -196,36 +217,42 @@ export default function ExplorerPage() {
                 </h3>
               </div>
               <div className="divide-y divide-gray-200">
-                {filteredTransactions.map((tx) => (
-                  <div
-                    key={tx.id}
-                    onClick={() => setSelectedTx(tx)}
-                    className={`px-6 py-4 cursor-pointer hover:bg-gray-50 transition-colors ${
-                      selectedTx?.id === tx.id ? 'bg-blue-50 border-l-4 border-blue-500' : ''
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0">
-                          {getStatusIcon(tx.status)}
+                {filteredTransactions.length > 0 ? (
+                  filteredTransactions.map((tx) => (
+                    <div
+                      key={tx.id}
+                      onClick={() => setSelectedTx(tx)}
+                      className={`px-6 py-4 cursor-pointer hover:bg-gray-50 transition-colors ${
+                        selectedTx?.id === tx.id ? 'bg-blue-50 border-l-4 border-blue-500' : ''
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0">
+                            {getStatusIcon(tx.status)}
+                          </div>
+                          <div className="ml-4">
+                            <p className="text-sm font-medium text-gray-900">{tx.type}</p>
+                            <p className="text-sm text-gray-500">ID: {tx.id.slice(0, 16)}...</p>
+                          </div>
                         </div>
-                        <div className="ml-4">
-                          <p className="text-sm font-medium text-gray-900">{tx.type}</p>
-                          <p className="text-sm text-gray-500">ID: {tx.id.slice(0, 16)}...</p>
+                        <div className="text-right">
+                          <p className="text-sm font-medium text-gray-900">{tx.amount}</p>
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(tx.status)}`}>
+                            {tx.status}
+                          </span>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm font-medium text-gray-900">{tx.amount}</p>
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(tx.status)}`}>
-                          {tx.status}
-                        </span>
+                      <div className="mt-2 text-sm text-gray-500">
+                        {new Date(tx.timestamp).toLocaleString()}
                       </div>
                     </div>
-                    <div className="mt-2 text-sm text-gray-500">
-                      {new Date(tx.timestamp).toLocaleString()}
-                    </div>
+                  ))
+                ) : (
+                  <div className="px-6 py-8 text-center text-gray-500">
+                    <p>{networkStatus ? 'No transactions found matching your search criteria.' : 'No transactions available. Please connect to the local network.'}</p>
                   </div>
-                ))}
+                )}
               </div>
             </div>
           </div>

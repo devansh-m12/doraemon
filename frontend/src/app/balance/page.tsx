@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Search, Wallet, ArrowLeft, Copy, CheckCircle, RefreshCw, TrendingUp, TrendingDown, Activity } from 'lucide-react'
+import { checkICPBalance, getTransactionHistory, isValidPrincipal, checkNetworkStatus } from '@/utils/icp'
 
 interface BalanceInfo {
   principal: string
@@ -30,44 +31,16 @@ export default function BalancePage() {
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
   const [transactionHistory, setTransactionHistory] = useState<TransactionHistory[]>([])
+  const [networkStatus, setNetworkStatus] = useState<boolean>(false)
 
-  // Mock data for demonstration
-  const mockBalanceData: BalanceInfo = {
-    principal: '0x94cf75948a5d11686c7cff96ce35e4be1eb9baecfed191ad06122d49398f80c9',
-    balance: 1000.0,
-    currency: 'ICP',
-    lastUpdated: new Date().toISOString(),
-    transactions: 42,
-    incoming: 15,
-    outgoing: 27
-  }
-
-  const mockTransactionHistory: TransactionHistory[] = [
-    {
-      id: '0x235dfe7fd1b68dedf148ca616fae70df5f7a6570a4b42cff55534a3dbe92ffae',
-      type: 'incoming',
-      amount: 0.001,
-      timestamp: '2025-07-28T08:41:57.000Z',
-      counterparty: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266',
-      status: 'completed'
-    },
-    {
-      id: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
-      type: 'outgoing',
-      amount: 0.005,
-      timestamp: '2025-07-28T07:30:15.000Z',
-      counterparty: '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
-      status: 'completed'
-    },
-    {
-      id: '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
-      type: 'incoming',
-      amount: 0.002,
-      timestamp: '2025-07-28T06:15:42.000Z',
-      counterparty: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
-      status: 'pending'
+  // Check network status on component mount
+  useEffect(() => {
+    const checkNetwork = async () => {
+      const status = await checkNetworkStatus('local')
+      setNetworkStatus(status)
     }
-  ]
+    checkNetwork()
+  }, [])
 
   const checkBalance = async () => {
     if (!searchAddress.trim()) {
@@ -75,18 +48,35 @@ export default function BalancePage() {
       return
     }
 
+    if (!isValidPrincipal(searchAddress)) {
+      setError('Invalid ICP Principal ID format')
+      return
+    }
+
     setLoading(true)
     setError(null)
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      // Use real ICP balance checking
+      const balance = await checkICPBalance(searchAddress, 'local')
+      setBalanceInfo(balance)
+
+      // Get real transaction history
+      const transactions = await getTransactionHistory(searchAddress, 'local')
       
-      // For demo purposes, use mock data
-      setBalanceInfo(mockBalanceData)
-      setTransactionHistory(mockTransactionHistory)
+      // Convert to transaction history format
+      const history: TransactionHistory[] = transactions.map(tx => ({
+        id: tx.id,
+        type: tx.recipient === searchAddress ? 'incoming' : 'outgoing',
+        amount: parseFloat(tx.amount.split(' ')[0]),
+        timestamp: tx.timestamp,
+        counterparty: tx.sender === searchAddress ? tx.recipient : tx.sender,
+        status: tx.status === 'Completed' ? 'completed' : tx.status === 'Pending' ? 'pending' : 'failed'
+      }))
+
+      setTransactionHistory(history)
     } catch (err) {
-      setError('Failed to fetch balance information')
+      setError(err instanceof Error ? err.message : 'Failed to fetch balance information')
     } finally {
       setLoading(false)
     }
@@ -152,6 +142,9 @@ export default function BalancePage() {
               <Link href="/balance" className="text-gray-900 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">
                 Balance Checker
               </Link>
+              <Link href="/swap" className="text-gray-500 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">
+                Swap
+              </Link>
             </nav>
           </div>
         </div>
@@ -159,6 +152,16 @@ export default function BalancePage() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        {/* Network Status */}
+        <div className="mb-6">
+          <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+            networkStatus ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+          }`}>
+            <div className={`w-2 h-2 rounded-full mr-2 ${networkStatus ? 'bg-green-500' : 'bg-red-500'}`}></div>
+            {networkStatus ? 'ICP Local Network Connected' : 'ICP Local Network Disconnected'}
+          </div>
+        </div>
+
         {/* Search Section */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <div className="max-w-2xl mx-auto">
@@ -178,7 +181,7 @@ export default function BalancePage() {
               </div>
               <button
                 onClick={checkBalance}
-                disabled={loading}
+                disabled={loading || !networkStatus}
                 className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? (
@@ -196,6 +199,11 @@ export default function BalancePage() {
             </div>
             {error && (
               <p className="mt-2 text-sm text-red-600">{error}</p>
+            )}
+            {!networkStatus && (
+              <p className="mt-2 text-sm text-yellow-600">
+                ⚠️ ICP local network is not running. Please start the local network first.
+              </p>
             )}
           </div>
         </div>
@@ -280,32 +288,38 @@ export default function BalancePage() {
                 <h3 className="text-lg font-medium text-gray-900">Transaction History</h3>
               </div>
               <div className="divide-y divide-gray-200">
-                {transactionHistory.map((tx) => (
-                  <div key={tx.id} className="px-6 py-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0">
-                          {getStatusIcon(tx.status)}
+                {transactionHistory.length > 0 ? (
+                  transactionHistory.map((tx) => (
+                    <div key={tx.id} className="px-6 py-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0">
+                            {getStatusIcon(tx.status)}
+                          </div>
+                          <div className="ml-4">
+                            <p className="text-sm font-medium text-gray-900">
+                              {tx.type === 'incoming' ? 'Received' : 'Sent'} {tx.amount} {balanceInfo.currency}
+                            </p>
+                            <p className="text-sm text-gray-500">ID: {tx.id.slice(0, 16)}...</p>
+                          </div>
                         </div>
-                        <div className="ml-4">
-                          <p className="text-sm font-medium text-gray-900">
-                            {tx.type === 'incoming' ? 'Received' : 'Sent'} {tx.amount} {balanceInfo.currency}
-                          </p>
-                          <p className="text-sm text-gray-500">ID: {tx.id.slice(0, 16)}...</p>
+                        <div className="text-right">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(tx.status)}`}>
+                            {tx.status}
+                          </span>
+                          <p className="text-sm text-gray-500 mt-1">{new Date(tx.timestamp).toLocaleString()}</p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(tx.status)}`}>
-                          {tx.status}
-                        </span>
-                        <p className="text-sm text-gray-500 mt-1">{new Date(tx.timestamp).toLocaleString()}</p>
+                      <div className="mt-2 text-sm text-gray-500">
+                        <span className="font-medium">Counterparty:</span> {tx.counterparty.slice(0, 16)}...
                       </div>
                     </div>
-                    <div className="mt-2 text-sm text-gray-500">
-                      <span className="font-medium">Counterparty:</span> {tx.counterparty.slice(0, 16)}...
-                    </div>
+                  ))
+                ) : (
+                  <div className="px-6 py-8 text-center text-gray-500">
+                    <p>No transaction history found for this address.</p>
                   </div>
-                ))}
+                )}
               </div>
             </div>
           </>
@@ -321,8 +335,8 @@ export default function BalancePage() {
                   <span className="text-blue-600 text-sm font-medium">1</span>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-900">Enter the ICP Principal ID you want to check</p>
-                  <p className="text-sm text-gray-500">Example: 0x94cf75948a5d11686c7cff96ce35e4be1eb9baecfed191ad06122d49398f80c9</p>
+                  <p className="text-sm text-gray-900">Ensure the ICP local network is running</p>
+                  <p className="text-sm text-gray-500">Run: dfx start --clean --background</p>
                 </div>
               </div>
               <div className="flex items-start space-x-3">
@@ -330,7 +344,8 @@ export default function BalancePage() {
                   <span className="text-blue-600 text-sm font-medium">2</span>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-900">Click "Check Balance" to fetch the latest balance information</p>
+                  <p className="text-sm text-gray-900">Enter the ICP Principal ID you want to check</p>
+                  <p className="text-sm text-gray-500">Example: 0x94cf75948a5d11686c7cff96ce35e4be1eb9baecfed191ad06122d49398f80c9</p>
                 </div>
               </div>
               <div className="flex items-start space-x-3">
@@ -338,7 +353,7 @@ export default function BalancePage() {
                   <span className="text-blue-600 text-sm font-medium">3</span>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-900">View detailed balance information and transaction history</p>
+                  <p className="text-sm text-gray-900">Click "Check Balance" to fetch the latest balance information</p>
                 </div>
               </div>
             </div>
