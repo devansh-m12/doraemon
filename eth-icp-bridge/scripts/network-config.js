@@ -1,202 +1,90 @@
 const fs = require('fs');
 const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 /**
- * Network Configuration Helper
- * Manages environment variables for different networks (local and Sepolia)
+ * Network Configuration Manager
+ * Sets up environment variables based on network selection
  */
-
 class NetworkConfig {
-  constructor() {
-    this.envPath = path.join(__dirname, '..', '.env');
-    this.envExamplePath = path.join(__dirname, '..', 'env.example');
-  }
-
-  /**
-   * Get current network from environment
-   */
-  getCurrentNetwork() {
-    if (fs.existsSync(this.envPath)) {
-      const envContent = fs.readFileSync(this.envPath, 'utf8');
-      const networkMatch = envContent.match(/NETWORK=(\w+)/);
-      return networkMatch ? networkMatch[1] : 'sepolia';
-    }
-    return 'sepolia'; // default
-  }
-
-  /**
-   * Get environment variables for a specific network
-   */
-  getNetworkConfig(network = 'sepolia') {
-    const configs = {
-      local: {
-        RPC_URL: 'LOCAL_RPC_URL',
-        PRIVATE_KEY: 'LOCAL_PRIVATE_KEY',
-        CONTRACT_ADDRESS: 'LOCAL_CONTRACT_ADDRESS',
-        WALLET_ADDRESS: 'LOCAL_WALLET_ADDRESS',
-        CHAIN_ID: 1337,
-        NETWORK_NAME: 'Local Hardhat Network'
-      },
-      sepolia: {
-        RPC_URL: 'SEPOLIA_RPC_URL',
-        PRIVATE_KEY: 'SEPOLIA_PRIVATE_KEY',
-        CONTRACT_ADDRESS: 'SEPOLIA_CONTRACT_ADDRESS',
-        WALLET_ADDRESS: 'SEPOLIA_WALLET_ADDRESS',
-        CHAIN_ID: 11155111,
-        NETWORK_NAME: 'Sepolia Testnet'
-      }
-    };
-
-    return configs[network] || configs.sepolia;
-  }
-
-  /**
-   * Switch to a different network
-   */
-  switchNetwork(targetNetwork) {
-    const validNetworks = ['local', 'sepolia'];
-    
-    if (!validNetworks.includes(targetNetwork)) {
-      throw new Error(`Invalid network: ${targetNetwork}. Valid networks: ${validNetworks.join(', ')}`);
+    constructor() {
+        this.network = process.env.NETWORK || 'local';
+        this.config = this.loadNetworkConfig();
     }
 
-    console.log(`🔄 Switching to ${targetNetwork} network...`);
+    loadNetworkConfig() {
+        const configs = {
+            local: {
+                rpcUrl: process.env.LOCAL_RPC_URL,
+                privateKey: process.env.LOCAL_PRIVATE_KEY,
+                contractAddress: process.env.LOCAL_CONTRACT_ADDRESS,
+                walletAddress: process.env.LOCAL_WALLET_ADDRESS,
+                chainId: 1337,
+                networkName: 'Local Hardhat Network'
+            },
+            sepolia: {
+                rpcUrl: process.env.SEPOLIA_RPC_URL,
+                privateKey: process.env.SEPOLIA_PRIVATE_KEY,
+                contractAddress: process.env.SEPOLIA_CONTRACT_ADDRESS,
+                walletAddress: process.env.SEPOLIA_WALLET_ADDRESS,
+                chainId: 11155111,
+                networkName: 'Sepolia Testnet'
+            }
+        };
 
-    if (!fs.existsSync(this.envPath)) {
-      console.log('⚠️  No .env file found. Please copy env.example to .env and configure it.');
-      return false;
+        return configs[this.network] || configs.local;
     }
 
-    let envContent = fs.readFileSync(this.envPath, 'utf8');
-    
-    // Update NETWORK variable
-    envContent = envContent.replace(/NETWORK=\w+/, `NETWORK=${targetNetwork}`);
-    
-    fs.writeFileSync(this.envPath, envContent);
-    
-    console.log(`✅ Switched to ${targetNetwork} network`);
-    return true;
-  }
-
-  /**
-   * Display current network configuration
-   */
-  showCurrentConfig() {
-    const currentNetwork = this.getCurrentNetwork();
-    const config = this.getNetworkConfig(currentNetwork);
-    
-    console.log(`\n📋 Current Network Configuration:`);
-    console.log(`Network: ${currentNetwork}`);
-    console.log(`Chain ID: ${config.CHAIN_ID}`);
-    console.log(`Network Name: ${config.NETWORK_NAME}`);
-    
-    if (fs.existsSync(this.envPath)) {
-      const envContent = fs.readFileSync(this.envPath, 'utf8');
-      
-      // Show relevant environment variables
-      const rpcUrl = envContent.match(new RegExp(`${config.RPC_URL}=(.+)`));
-      const contractAddress = envContent.match(new RegExp(`${config.CONTRACT_ADDRESS}=(.+)`));
-      const walletAddress = envContent.match(new RegExp(`${config.WALLET_ADDRESS}=(.+)`));
-      
-      console.log(`RPC URL: ${rpcUrl ? rpcUrl[1] : 'Not set'}`);
-      console.log(`Contract Address: ${contractAddress ? contractAddress[1] : 'Not set'}`);
-      console.log(`Wallet Address: ${walletAddress ? walletAddress[1] : 'Not set'}`);
-    } else {
-      console.log('⚠️  No .env file found');
-    }
-  }
-
-  /**
-   * Validate network configuration
-   */
-  validateConfig(network = null) {
-    const targetNetwork = network || this.getCurrentNetwork();
-    const config = this.getNetworkConfig(targetNetwork);
-    
-    if (!fs.existsSync(this.envPath)) {
-      console.log('❌ No .env file found');
-      return false;
+    getEnvironmentVariables() {
+        return {
+            ETHEREUM_RPC_URL: this.config.rpcUrl,
+            ETHEREUM_PRIVATE_KEY: this.config.privateKey,
+            ETHEREUM_CONTRACT_ADDRESS: this.config.contractAddress,
+            ETHEREUM_WALLET_ADDRESS: this.config.walletAddress,
+            CHAIN_ID: this.config.chainId,
+            NETWORK_NAME: this.config.networkName
+        };
     }
 
-    const envContent = fs.readFileSync(this.envPath, 'utf8');
-    const requiredVars = [
-      config.RPC_URL,
-      config.PRIVATE_KEY,
-      config.CONTRACT_ADDRESS,
-      config.WALLET_ADDRESS
-    ];
+    validateConfig() {
+        const required = ['rpcUrl', 'privateKey', 'contractAddress', 'walletAddress'];
+        const missing = required.filter(key => !this.config[key]);
+        
+        if (missing.length > 0) {
+            throw new Error(`Missing required configuration for ${this.network} network: ${missing.join(', ')}`);
+        }
 
-    const missing = [];
-    for (const varName of requiredVars) {
-      if (!envContent.includes(`${varName}=`) || envContent.match(new RegExp(`${varName}=\\s*$`))) {
-        missing.push(varName);
-      }
+        return true;
     }
 
-    if (missing.length > 0) {
-      console.log(`❌ Missing required environment variables for ${targetNetwork}:`);
-      missing.forEach(varName => console.log(`  - ${varName}`));
-      return false;
+    printConfig() {
+        console.log(`🔧 Network Configuration: ${this.config.networkName}`);
+        console.log(`📍 Network: ${this.network.toUpperCase()}`);
+        console.log(`🔗 RPC URL: ${this.config.rpcUrl}`);
+        console.log(`📝 Contract: ${this.config.contractAddress}`);
+        console.log(`👛 Wallet: ${this.config.walletAddress}`);
+        console.log(`🆔 Chain ID: ${this.config.chainId}`);
+        console.log('');
     }
 
-    console.log(`✅ ${targetNetwork} network configuration is valid`);
-    return true;
-  }
+    setupEnvironment() {
+        this.validateConfig();
+        
+        // Set environment variables
+        Object.entries(this.getEnvironmentVariables()).forEach(([key, value]) => {
+            process.env[key] = value;
+        });
 
-  /**
-   * Get deployment info for current network
-   */
-  getDeploymentInfo(network = null) {
-    const targetNetwork = network || this.getCurrentNetwork();
-    const deploymentFile = path.join(__dirname, '..', 'ethereum-contracts', `deployment-${targetNetwork === 'local' ? 'localhost' : targetNetwork}.json`);
-    
-    if (fs.existsSync(deploymentFile)) {
-      const deployment = JSON.parse(fs.readFileSync(deploymentFile, 'utf8'));
-      return deployment;
+        this.printConfig();
+        return this.config;
     }
-    
-    return null;
-  }
 }
 
 // Export for use in other scripts
 module.exports = NetworkConfig;
 
-// CLI usage
+// If run directly, setup and print configuration
 if (require.main === module) {
-  const config = new NetworkConfig();
-  const command = process.argv[2];
-  
-  switch (command) {
-    case 'show':
-      config.showCurrentConfig();
-      break;
-    case 'switch':
-      const network = process.argv[3];
-      if (!network) {
-        console.log('Usage: node network-config.js switch <local|sepolia>');
-        process.exit(1);
-      }
-      config.switchNetwork(network);
-      break;
-    case 'validate':
-      const targetNetwork = process.argv[3];
-      config.validateConfig(targetNetwork);
-      break;
-    case 'deployment':
-      const deployment = config.getDeploymentInfo();
-      if (deployment) {
-        console.log('📄 Deployment Info:', JSON.stringify(deployment, null, 2));
-      } else {
-        console.log('❌ No deployment info found');
-      }
-      break;
-    default:
-      console.log('Network Configuration Helper');
-      console.log('Usage:');
-      console.log('  node network-config.js show                    - Show current configuration');
-      console.log('  node network-config.js switch <local|sepolia>  - Switch network');
-      console.log('  node network-config.js validate [network]      - Validate configuration');
-      console.log('  node network-config.js deployment              - Show deployment info');
-  }
+    const config = new NetworkConfig();
+    config.setupEnvironment();
 } 

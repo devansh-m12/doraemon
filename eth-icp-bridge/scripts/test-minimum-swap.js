@@ -1,12 +1,16 @@
 const { ethers } = require('ethers');
 const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+const NetworkConfig = require('./network-config');
 
 /**
  * Test minimum amount swap with Etherscan tracking
  */
 class MinimumSwapTest {
     constructor() {
+        // Setup network configuration
+        const networkConfig = new NetworkConfig();
+        networkConfig.setupEnvironment();
+        
         this.provider = new ethers.JsonRpcProvider(process.env.ETHEREUM_RPC_URL);
         this.wallet = new ethers.Wallet(process.env.ETHEREUM_PRIVATE_KEY, this.provider);
         this.contractAddress = process.env.ETHEREUM_CONTRACT_ADDRESS;
@@ -73,7 +77,7 @@ class MinimumSwapTest {
         console.log('💸 Total Cost (swap + gas):', ethers.formatEther(this.minAmount + gasCost), 'ETH');
         console.log('');
         
-        // Create the swap transaction
+        // Create the swap transaction with proper ETH value
         const tx = await this.contract.createSwap(
             icpRecipient,
             hashlock,
@@ -86,7 +90,14 @@ class MinimumSwapTest {
         
         console.log('📤 Transaction sent!');
         console.log('Transaction Hash:', tx.hash);
-        console.log('Etherscan URL:', `https://sepolia.etherscan.io/tx/${tx.hash}`);
+        
+        // Show appropriate explorer URL based on network
+        const networkName = process.env.NETWORK_NAME || 'Local';
+        if (networkName.includes('Local')) {
+            console.log('🔍 Local Network - Check Hardhat node logs');
+        } else {
+            console.log('Etherscan URL:', `https://sepolia.etherscan.io/tx/${tx.hash}`);
+        }
         console.log('');
         
         // Wait for transaction confirmation
@@ -124,7 +135,6 @@ class MinimumSwapTest {
                 hashlock: hashlock,
                 timelock: timelock,
                 txHash: tx.hash,
-                etherscanUrl: `https://sepolia.etherscan.io/tx/${tx.hash}`,
                 gasUsed: receipt.gasUsed.toString(),
                 effectiveGasPrice: ethers.formatUnits(receipt.gasPrice, 'gwei')
             };
@@ -132,8 +142,7 @@ class MinimumSwapTest {
             console.log('⚠️ No SwapCreated event found');
             return {
                 success: false,
-                txHash: tx.hash,
-                etherscanUrl: `https://sepolia.etherscan.io/tx/${tx.hash}`
+                txHash: tx.hash
             };
         }
     }
@@ -154,17 +163,14 @@ class MinimumSwapTest {
                 console.log('📊 Test Results:');
                 console.log('✅ Swap created successfully');
                 console.log('📋 Order ID:', result.orderId);
-                console.log('🔗 Etherscan:', result.etherscanUrl);
                 console.log('⛽ Gas Used:', result.gasUsed);
                 console.log('💰 Gas Price:', result.effectiveGasPrice, 'gwei');
                 console.log('');
                 console.log('🎯 Next Steps:');
-                console.log('1. View transaction on Etherscan:', result.etherscanUrl);
-                console.log('2. Monitor swap status on the contract');
-                console.log('3. Complete the swap with preimage when ready');
+                console.log('1. Monitor swap status on the contract');
+                console.log('2. Complete the swap with preimage when ready');
             } else {
                 console.log('❌ Swap creation failed');
-                console.log('🔗 Etherscan:', result.etherscanUrl);
             }
             
             return result;
