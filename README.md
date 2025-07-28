@@ -53,6 +53,15 @@ eth-icp-bridge/
 - DFX (Internet Computer SDK)
 - Git
 
+### Secure Environment Setup
+
+This project uses a secure environment configuration that separates sensitive data from public configuration:
+
+- **Public Configuration**: `.env.example` → `.env` (safe to commit)
+- **Sensitive Data**: `env.secrets.example` → `.env.secrets` (NEVER commit)
+
+For detailed setup instructions, see [SECURE_SETUP_README.md](SECURE_SETUP_README.md).
+
 ### Installation
 
 ```bash
@@ -67,14 +76,19 @@ npm install
 sh -ci "$(curl -fsSL https://internetcomputer.org/install.sh)"
 source "$HOME/Library/Application Support/org.dfinity.dfx/env"
 
-# Set up environment variables
-cp .env.example .env
-# Edit .env with your configuration
+# Set up secure environment configuration
+./setup-secrets.sh
+# Edit .env.secrets with your sensitive data
 ```
 
 ### Development Setup
 
 ```bash
+# Start the complete development environment
+./start.sh
+
+# Or run components individually:
+
 # Ethereum contracts
 cd ethereum-contracts
 npm install

@@ -60,6 +60,11 @@ icp-canisters/bridge_canister/.env
 .env.test.local
 .env.production.local
 
+# Sensitive data files
+.env.secrets
+.env.secrets.local
+.env.secrets.production
+
 # Configuration files with secrets
 config/secrets.json
 config/private.json
