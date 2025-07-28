@@ -239,47 +239,64 @@ class FusionSwapCompleteTest {
      * Step 4: Check ICP balance status
      */
     async checkICPBalanceStatus() {
-        console.log('\n🌐 Step 4: Checking ICP Balance Status');
+        console.log('\n🌐 Step 4: Checking Real ICP Balance Status');
         console.log('=' .repeat(40));
         
         try {
             console.log('📋 ICP Canister ID:', this.icpCanisterId);
             
-            // Simulate ICP balance check (since we can't actually call ICP in this test)
-            console.log('🔍 Checking ICP canister status...');
+            // Initialize ICP client for real calls
+            const ICPCanisterClient = require('./icp-canister-client');
+            const icpClient = new ICPCanisterClient(this.icpCanisterId, 'local');
             
-            // Mock ICP balance check
-            const mockICPBalance = {
-                canisterId: this.icpCanisterId,
-                balance: '1000.0', // Mock ICP balance
-                swapOrders: 1,
-                pendingSwaps: 1,
-                completedSwaps: 0
-            };
+            // Test real ICP connectivity
+            console.log('🔍 Testing real ICP canister connectivity...');
+            const connectivityTest = await icpClient.testConnectivity();
             
-            console.log('✅ ICP Canister Status:');
-            console.log('Canister ID:', mockICPBalance.canisterId);
-            console.log('ICP Balance:', mockICPBalance.balance, 'ICP');
-            console.log('Swap Orders:', mockICPBalance.swapOrders);
-            console.log('Pending Swaps:', mockICPBalance.pendingSwaps);
-            console.log('Completed Swaps:', mockICPBalance.completedSwaps);
-            
-            // Check if our swap order exists
-            if (this.testResults.orderId) {
-                console.log('🔍 Checking swap order status...');
-                console.log('Order ID:', this.testResults.orderId);
-                console.log('Status: PENDING');
-                console.log('Hashlock:', this.testResults.hashlock);
-                console.log('Timelock:', new Date(this.testResults.timelock * 1000).toISOString());
+            if (connectivityTest.success) {
+                console.log('✅ Real ICP Canister Status:');
+                console.log('Canister ID:', this.icpCanisterId);
+                console.log('Response:', connectivityTest.response);
+                
+                // Get real bridge configuration
+                const bridgeConfig = await icpClient.getBridgeConfig();
+                console.log('🔧 Real Bridge Configuration:');
+                console.log('Bridge Fee:', bridgeConfig.bridge_fee_percentage, 'basis points');
+                console.log('Min Swap Amount:', bridgeConfig.min_swap_amount, 'e8s');
+                console.log('Max Swap Amount:', bridgeConfig.max_swap_amount, 'e8s');
+                console.log('Chain Fusion Enabled:', bridgeConfig.chain_fusion_enabled);
+                
+                // Check if our swap order exists
+                if (this.testResults.orderId) {
+                    console.log('🔍 Checking real swap order status...');
+                    try {
+                        const swapOrder = await icpClient.getSwapOrder(this.testResults.orderId);
+                        console.log('Order ID:', this.testResults.orderId);
+                        console.log('Status:', swapOrder.completed ? 'COMPLETED' : swapOrder.refunded ? 'REFUNDED' : 'PENDING');
+                        console.log('Hashlock:', Buffer.from(swapOrder.hashlock).toString('hex'));
+                        console.log('Timelock:', new Date(swapOrder.timelock * 1000).toISOString());
+                        console.log('Amount:', swapOrder.amount, 'e8s');
+                    } catch (error) {
+                        console.log('Order not found on ICP (expected for new orders)');
+                    }
+                }
+                
+                this.testResults.icpBalanceChecked = true;
+                this.testResults.icpBalance = {
+                    canisterId: this.icpCanisterId,
+                    bridgeConfig: bridgeConfig,
+                    connectivity: connectivityTest,
+                    realCall: true
+                };
+                
+                return true;
+            } else {
+                console.log('❌ ICP canister connectivity failed:', connectivityTest.error);
+                return false;
             }
             
-            this.testResults.icpBalanceChecked = true;
-            this.testResults.icpBalance = mockICPBalance;
-            
-            return true;
-            
         } catch (error) {
-            console.error('❌ Error checking ICP balance status:', error.message);
+            console.error('❌ Error checking real ICP balance status:', error.message);
             return false;
         }
     }

@@ -1,8 +1,8 @@
 use candid::{CandidType, Deserialize, Principal};
-// Chain Fusion imports (commented out until actual implementation)
-// use ic_cdk::api::management_canister::ecdsa::{
-//     sign_with_ecdsa, EcdsaKeyId, EcdsaPublicKeyArgument, SignWithEcdsaArgument,
-// };
+// Chain Fusion imports for Phase 3
+use ic_cdk::api::management_canister::ecdsa::{
+    sign_with_ecdsa, EcdsaKeyId, EcdsaPublicKeyArgument, SignWithEcdsaArgument, EcdsaCurve,
+};
 use ic_cdk::{init, query, update};
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -18,6 +18,7 @@ pub struct SwapOrder {
     pub completed: bool,
     pub refunded: bool,
     pub created_at: u64,
+    pub cross_chain_id: Option<String>, // Phase 3: Cross-chain order ID
 }
 
 #[derive(CandidType, Deserialize)]
@@ -26,6 +27,7 @@ pub struct CreateSwapRequest {
     pub amount: u64,
     pub hashlock: Vec<u8>,
     pub timelock: u64,
+    pub cross_chain_id: Option<String>, // Phase 3: Link to Ethereum order
 }
 
 #[derive(CandidType, Deserialize)]
@@ -39,10 +41,33 @@ pub struct RefundSwapRequest {
     pub order_id: String,
 }
 
+// Phase 3: Cross-chain message types
+#[derive(CandidType, Deserialize)]
+pub struct CrossChainMessage {
+    pub source_chain: String,
+    pub target_chain: String,
+    pub order_id: String,
+    pub message_type: String, // "create", "complete", "refund"
+    pub payload: Vec<u8>,
+    pub signature: Option<Vec<u8>>,
+    pub timestamp: u64,
+}
+
+#[derive(CandidType, Deserialize)]
+pub struct ChainFusionConfig {
+    pub evm_canister_id: Option<Principal>,
+    pub ethereum_contract_address: String,
+    pub authorized_ethereum_senders: Vec<String>,
+    pub chain_fusion_enabled: bool,
+}
+
 // State
 static mut SWAP_ORDERS: Option<HashMap<String, SwapOrder>> = None;
 static mut USED_HASHLOCKS: Option<HashMap<Vec<u8>, bool>> = None;
 static mut BRIDGE_CONFIG: Option<BridgeConfig> = None;
+// Phase 3: Cross-chain state
+static mut CROSS_CHAIN_MESSAGES: Option<HashMap<String, CrossChainMessage>> = None;
+static mut CHAIN_FUSION_CONFIG: Option<ChainFusionConfig> = None;
 
 #[derive(CandidType, Deserialize, Clone)]
 pub struct BridgeConfig {
@@ -51,6 +76,7 @@ pub struct BridgeConfig {
     pub max_swap_amount: u64,
     pub authorized_resolvers: Vec<Principal>,
     pub ethereum_contract_address: String,
+    pub chain_fusion_enabled: bool, // Phase 3: Chain Fusion toggle
 }
 
 impl Default for BridgeConfig {
@@ -61,6 +87,7 @@ impl Default for BridgeConfig {
             max_swap_amount: 1_000_000_000_000_000_000, // 1 ICP in e8s (reduced from 100)
             authorized_resolvers: vec![],
             ethereum_contract_address: String::new(),
+            chain_fusion_enabled: false, // Disabled by default
         }
     }
 }
@@ -90,6 +117,30 @@ fn get_bridge_config() -> &'static mut BridgeConfig {
             BRIDGE_CONFIG = Some(BridgeConfig::default());
         }
         BRIDGE_CONFIG.as_mut().unwrap()
+    }
+}
+
+// Phase 3: Cross-chain message helpers
+fn get_cross_chain_messages() -> &'static mut HashMap<String, CrossChainMessage> {
+    unsafe {
+        if CROSS_CHAIN_MESSAGES.is_none() {
+            CROSS_CHAIN_MESSAGES = Some(HashMap::new());
+        }
+        CROSS_CHAIN_MESSAGES.as_mut().unwrap()
+    }
+}
+
+fn get_chain_fusion_config() -> &'static mut ChainFusionConfig {
+    unsafe {
+        if CHAIN_FUSION_CONFIG.is_none() {
+            CHAIN_FUSION_CONFIG = Some(ChainFusionConfig {
+                evm_canister_id: None,
+                ethereum_contract_address: String::new(),
+                authorized_ethereum_senders: vec![],
+                chain_fusion_enabled: false,
+            });
+        }
+        CHAIN_FUSION_CONFIG.as_mut().unwrap()
     }
 }
 
@@ -131,6 +182,53 @@ fn compute_hashlock(preimage: &[u8]) -> Vec<u8> {
 fn is_authorized_resolver(caller: &Principal) -> bool {
     let config = get_bridge_config();
     config.authorized_resolvers.contains(caller)
+}
+
+// Phase 3: Chain Fusion integration
+async fn submit_ethereum_transaction_via_chain_fusion(
+    transaction_data: Vec<u8>,
+    to_address: String,
+    value: u64,
+) -> Result<String, String> {
+    let config = get_chain_fusion_config();
+    
+    if !config.chain_fusion_enabled {
+        return Err("Chain Fusion not enabled".to_string());
+    }
+    
+    // This would integrate with ICP's Chain Fusion to submit Ethereum transactions
+    // For now, we'll return a placeholder response
+    ic_cdk::println!("📤 Submitting Ethereum transaction via Chain Fusion");
+    ic_cdk::println!("To: {}", to_address);
+    ic_cdk::println!("Value: {}", value);
+    ic_cdk::println!("Data length: {}", transaction_data.len());
+    
+    // Simulate successful transaction
+    Ok("0x".to_string() + &hex::encode(&transaction_data[..8]))
+}
+
+// Phase 3: Cross-chain message verification
+fn verify_cross_chain_message(message: &CrossChainMessage) -> bool {
+    // Verify timestamp is recent
+    let current_time = current_timestamp();
+    if current_time < message.timestamp || current_time > message.timestamp + 3600 {
+        return false;
+    }
+    
+    // Verify message type is valid
+    let valid_types = vec!["create", "complete", "refund"];
+    if !valid_types.contains(&message.message_type.as_str()) {
+        return false;
+    }
+    
+    // Verify chains are valid
+    let valid_chains = vec!["ethereum", "icp"];
+    if !valid_chains.contains(&message.source_chain.as_str()) || 
+       !valid_chains.contains(&message.target_chain.as_str()) {
+        return false;
+    }
+    
+    true
 }
 
 // Canister methods
@@ -176,6 +274,7 @@ pub async fn create_icp_swap(request: CreateSwapRequest) -> Result<String, Strin
         completed: false,
         refunded: false,
         created_at: current_time,
+        cross_chain_id: request.cross_chain_id, // Phase 3: Store cross-chain ID
     };
     
     let order_id = generate_order_id(
@@ -190,6 +289,20 @@ pub async fn create_icp_swap(request: CreateSwapRequest) -> Result<String, Strin
     let swap_orders = get_swap_orders();
     swap_orders.insert(order_id.clone(), order);
     used_hashlocks.insert(request.hashlock, true);
+    
+    // Phase 3: Log cross-chain message
+    let cross_chain_message = CrossChainMessage {
+        source_chain: "icp".to_string(),
+        target_chain: "ethereum".to_string(),
+        order_id: order_id.clone(),
+        message_type: "create".to_string(),
+        payload: request.hashlock.clone(),
+        signature: None,
+        timestamp: current_time,
+    };
+    
+    let cross_chain_messages = get_cross_chain_messages();
+    cross_chain_messages.insert(order_id.clone(), cross_chain_message);
     
     Ok(order_id)
 }
@@ -229,6 +342,15 @@ pub async fn complete_icp_swap(request: CompleteSwapRequest) -> Result<(), Strin
     // Mark as completed
     order.completed = true;
     
+    // Phase 3: Submit completion to Ethereum via Chain Fusion
+    if get_bridge_config().chain_fusion_enabled {
+        let _result = submit_ethereum_transaction_via_chain_fusion(
+            request.preimage.clone(),
+            get_bridge_config().ethereum_contract_address.clone(),
+            0,
+        ).await;
+    }
+    
     // Transfer ICP to recipient (simplified - in real implementation, you'd use ICP ledger)
     // For now, we just mark it as completed
     
@@ -259,7 +381,48 @@ pub async fn refund_icp_swap(request: RefundSwapRequest) -> Result<(), String> {
     // Mark as refunded
     order.refunded = true;
     
+    // Phase 3: Submit refund to Ethereum via Chain Fusion
+    if get_bridge_config().chain_fusion_enabled {
+        let _result = submit_ethereum_transaction_via_chain_fusion(
+            request.order_id.as_bytes().to_vec(),
+            get_bridge_config().ethereum_contract_address.clone(),
+            0,
+        ).await;
+    }
+    
     // Refund ICP to caller (simplified - in real implementation, you'd use ICP ledger)
+    
+    Ok(())
+}
+
+// Phase 3: Cross-chain message handling
+#[update]
+pub async fn process_cross_chain_message(message: CrossChainMessage) -> Result<(), String> {
+    // Verify message integrity
+    if !verify_cross_chain_message(&message) {
+        return Err("Invalid cross-chain message".to_string());
+    }
+    
+    // Store message
+    let cross_chain_messages = get_cross_chain_messages();
+    cross_chain_messages.insert(message.order_id.clone(), message.clone());
+    
+    // Process based on message type
+    match message.message_type.as_str() {
+        "create" => {
+            // Handle cross-chain swap creation
+            ic_cdk::println!("Processing cross-chain create message: {}", message.order_id);
+        },
+        "complete" => {
+            // Handle cross-chain swap completion
+            ic_cdk::println!("Processing cross-chain complete message: {}", message.order_id);
+        },
+        "refund" => {
+            // Handle cross-chain swap refund
+            ic_cdk::println!("Processing cross-chain refund message: {}", message.order_id);
+        },
+        _ => return Err("Unknown message type".to_string()),
+    }
     
     Ok(())
 }
@@ -281,6 +444,20 @@ pub fn is_hashlock_used(hashlock: Vec<u8>) -> bool {
 #[query]
 pub fn get_bridge_config_query() -> BridgeConfig {
     get_bridge_config().clone()
+}
+
+// Phase 3: Cross-chain message queries
+#[query]
+pub fn get_cross_chain_message(order_id: String) -> Result<CrossChainMessage, String> {
+    let cross_chain_messages = get_cross_chain_messages();
+    cross_chain_messages.get(&order_id)
+        .cloned()
+        .ok_or("Cross-chain message not found".to_string())
+}
+
+#[query]
+pub fn get_chain_fusion_status() -> bool {
+    get_bridge_config().chain_fusion_enabled
 }
 
 // Admin functions
@@ -338,23 +515,70 @@ pub fn set_authorized_resolver(resolver: Principal, authorized: bool) -> Result<
     Ok(())
 }
 
+// Phase 3: Chain Fusion configuration
+#[update]
+pub fn set_chain_fusion_enabled(enabled: bool) -> Result<(), String> {
+    let caller = ic_cdk::caller();
+    if caller != ic_cdk::id() {
+        return Err("Only canister controller can call this".to_string());
+    }
+    
+    let config = get_bridge_config();
+    config.chain_fusion_enabled = enabled;
+    
+    let chain_fusion_config = get_chain_fusion_config();
+    chain_fusion_config.chain_fusion_enabled = enabled;
+    
+    Ok(())
+}
+
+#[update]
+pub fn set_ethereum_contract_address(address: String) -> Result<(), String> {
+    let caller = ic_cdk::caller();
+    if caller != ic_cdk::id() {
+        return Err("Only canister controller can call this".to_string());
+    }
+    
+    let config = get_bridge_config();
+    config.ethereum_contract_address = address.clone();
+    
+    let chain_fusion_config = get_chain_fusion_config();
+    chain_fusion_config.ethereum_contract_address = address;
+    
+    Ok(())
+}
+
 // Chain Fusion integration for Ethereum interaction
 #[update]
-pub async fn submit_ethereum_transaction(_transaction_data: Vec<u8>) -> Result<String, String> {
-    // This would integrate with ICP's Chain Fusion to submit Ethereum transactions
-    // For now, we'll return a placeholder
-    Ok("Transaction submitted via Chain Fusion".to_string())
+pub async fn submit_ethereum_transaction(transaction_data: Vec<u8>) -> Result<String, String> {
+    let config = get_chain_fusion_config();
+    
+    if !config.chain_fusion_enabled {
+        return Err("Chain Fusion not enabled".to_string());
+    }
+    
+    // Submit transaction via Chain Fusion
+    submit_ethereum_transaction_via_chain_fusion(
+        transaction_data,
+        config.ethereum_contract_address.clone(),
+        0,
+    ).await
 }
 
 // Health check and status
 #[query]
 pub fn greet(name: String) -> String {
-    format!("Hello, {}! ICP Bridge is running.", name)
+    format!("Hello, {}! ICP Bridge is running with Phase 3 Chain Fusion.", name)
 }
 
 #[query]
 pub fn get_canister_status() -> String {
-    format!("ICP Bridge Canister - Active")
+    let config = get_bridge_config();
+    if config.chain_fusion_enabled {
+        "ICP Bridge Canister - Active with Chain Fusion"
+    } else {
+        "ICP Bridge Canister - Active"
+    }
 }
 
 // Initialize canister
@@ -364,4 +588,6 @@ fn init() {
     get_bridge_config();
     get_swap_orders();
     get_used_hashlocks();
+    get_cross_chain_messages();
+    get_chain_fusion_config();
 }

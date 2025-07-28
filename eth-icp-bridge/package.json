@@ -30,13 +30,15 @@
   "dependencies": {
     "@1inch/fusion-sdk": "^2.3.5",
     "@dfinity/agent": "^3.1.0",
+    "@dfinity/candid": "^3.1.0",
     "@dfinity/principal": "^3.1.0",
     "@openzeppelin/contracts": "^5.4.0",
     "dotenv": "^17.2.1",
     "ejs": "^3.1.10",
     "ethers": "^6.15.0",
     "express": "^5.1.0",
-    "hardhat": "^2.26.1"
+    "hardhat": "^2.26.1",
+    "node-fetch": "^3.3.2"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.1.0",

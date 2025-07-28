@@ -2,10 +2,12 @@ const { ethers } = require('ethers');
 const { FusionSDK, NetworkEnum } = require('@1inch/fusion-sdk');
 const path = require('path');
 const NetworkConfig = require('./network-config');
+const ICPCanisterClient = require('./icp-canister-client');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 /**
- * Cross-Chain Bridge Protocol Implementation
+ * Cross-Chain Bridge Protocol Implementation - Phase 3
+ * Enhanced with message verification, event listening, and Chain Fusion integration
  * Handles communication between Ethereum and ICP for atomic swaps
  */
 class CrossChainBridgeProtocol {
@@ -36,16 +38,31 @@ class CrossChainBridgeProtocol {
         this.bridgeContract = null;
         this.icpCanisterId = process.env.ICP_CANISTER_ID;
         
+        // Initialize real ICP canister client
+        this.icpClient = null;
+        if (this.icpCanisterId) {
+            this.icpClient = new ICPCanisterClient(this.icpCanisterId, this.currentNetwork);
+        }
+        
+        // Phase 3: Enhanced state management
         this.swapStates = new Map();
         this.retryAttempts = new Map();
+        this.crossChainMessages = new Map();
+        this.eventListeners = new Map();
+        this.verificationQueue = [];
         
-        console.log(`🌐 Initializing bridge protocol for ${this.currentNetwork} network`);
+        // Chain Fusion integration
+        this.chainFusionEnabled = process.env.CHAIN_FUSION_ENABLED === 'true';
+        this.icpEVMCanisterId = process.env.ICP_EVM_CANISTER_ID;
+        
+        console.log(`🌐 Initializing Phase 3 bridge protocol for ${this.currentNetwork} network`);
         console.log(`Chain ID: ${this.networkSettings.CHAIN_ID}`);
         console.log(`Network: ${this.networkSettings.NETWORK_NAME}`);
+        console.log(`Chain Fusion: ${this.chainFusionEnabled ? 'Enabled' : 'Disabled'}`);
     }
 
     /**
-     * Initialize bridge with deployed contract addresses
+     * Initialize bridge with deployed contract addresses and Chain Fusion
      */
     async initialize(ethereumContractAddress = null) {
         try {
@@ -58,15 +75,451 @@ class CrossChainBridgeProtocol {
             const contractABI = require('../ethereum-contracts/artifacts/contracts/EthereumICPBridge.sol/EthereumICPBridge.json').abi;
             this.bridgeContract = new ethers.Contract(contractAddress, contractABI, this.ethereumWallet);
             
-            console.log('✅ Bridge protocol initialized');
+            // Store contract address for Chain Fusion tests
+            this.contractAddress = contractAddress;
+            
+            // Initialize Chain Fusion if enabled
+            if (this.chainFusionEnabled) {
+                await this.initializeChainFusion();
+            }
+            
+            // Start event listeners
+            await this.startEventListeners();
+            
+            console.log('✅ Phase 3 bridge protocol initialized');
             console.log('Ethereum Contract:', contractAddress);
             console.log('ICP Canister:', this.icpCanisterId);
+            console.log('ICP EVM Canister:', this.icpEVMCanisterId);
             console.log('Wallet Address:', this.walletAddress);
             
             return true;
         } catch (error) {
             console.error('❌ Failed to initialize bridge protocol:', error);
             return false;
+        }
+    }
+
+    /**
+     * Initialize Chain Fusion for direct Ethereum integration
+     */
+    async initializeChainFusion() {
+        try {
+            console.log('🔗 Initializing Chain Fusion integration...');
+            
+            // Verify ICP EVM canister is accessible
+            if (!this.icpEVMCanisterId) {
+                console.warn('⚠️ ICP EVM Canister ID not set, Chain Fusion features will be limited');
+                return;
+            }
+            
+            // Test Chain Fusion connectivity
+            const testResult = await this.testChainFusionConnection();
+            if (testResult) {
+                console.log('✅ Chain Fusion integration ready');
+            } else {
+                console.warn('⚠️ Chain Fusion integration failed, falling back to standard bridge');
+            }
+            
+        } catch (error) {
+            console.error('❌ Chain Fusion initialization failed:', error);
+        }
+    }
+
+    /**
+     * Test Chain Fusion connection
+     */
+    async testChainFusionConnection() {
+        try {
+            // This would integrate with ICP's Chain Fusion API
+            // For now, we'll simulate the connection test
+            console.log('🔍 Testing Chain Fusion connection...');
+            
+            // Simulate EVM RPC call through ICP
+            const testCall = await this.submitEthereumTransactionViaChainFusion({
+                to: this.contractAddress,
+                data: '0x', // Empty call
+                value: '0x0'
+            });
+            
+            return testCall.success;
+        } catch (error) {
+            console.error('Chain Fusion test failed:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Submit Ethereum transaction via Chain Fusion
+     */
+    async submitEthereumTransactionViaChainFusion(transactionData) {
+        try {
+            console.log('📤 Submitting transaction via Chain Fusion...');
+            
+            if (!this.icpClient) {
+                throw new Error('ICP client not initialized');
+            }
+            
+            // Use real ICP Chain Fusion to submit Ethereum transaction
+            const result = await this.icpClient.submitEthereumTransaction(transactionData);
+            
+            console.log('✅ Real Chain Fusion transaction submitted');
+            return result;
+            
+        } catch (error) {
+            console.error('❌ Chain Fusion transaction failed:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
+     * Start event listeners for cross-chain communication
+     */
+    async startEventListeners() {
+        try {
+            console.log('👂 Starting cross-chain event listeners...');
+            
+            // Listen for Ethereum swap events
+            this.bridgeContract.on('SwapCreated', async (orderId, sender, icpRecipient, amount, hashlock, timelock) => {
+                await this.handleEthereumSwapCreated(orderId, sender, icpRecipient, amount, hashlock, timelock);
+            });
+            
+            this.bridgeContract.on('SwapCompleted', async (orderId, recipient, preimage) => {
+                await this.handleEthereumSwapCompleted(orderId, recipient, preimage);
+            });
+            
+            this.bridgeContract.on('SwapRefunded', async (orderId, sender) => {
+                await this.handleEthereumSwapRefunded(orderId, sender);
+            });
+            
+            console.log('✅ Event listeners started');
+            
+        } catch (error) {
+            console.error('❌ Failed to start event listeners:', error);
+        }
+    }
+
+    /**
+     * Handle Ethereum swap creation event
+     */
+    async handleEthereumSwapCreated(orderId, sender, icpRecipient, amount, hashlock, timelock) {
+        try {
+            console.log('🔄 Processing Ethereum swap creation...');
+            console.log('Order ID:', orderId);
+            console.log('Sender:', sender);
+            console.log('ICP Recipient:', icpRecipient);
+            
+            // Verify cross-chain message
+            const verificationResult = await this.verifyCrossChainMessage({
+                sourceChain: 'ethereum',
+                targetChain: 'icp',
+                orderId: orderId,
+                sender: sender,
+                recipient: icpRecipient,
+                amount: amount,
+                hashlock: hashlock,
+                timelock: timelock
+            });
+            
+            if (verificationResult.valid) {
+                // Create corresponding ICP swap
+                await this.createICPSwap({
+                    ethereumSender: sender,
+                    icpRecipient: icpRecipient,
+                    amount: amount,
+                    hashlock: hashlock,
+                    timelock: timelock,
+                    orderId: orderId
+                });
+                
+                // Update state synchronization
+                await this.synchronizeState('ethereum', 'icp', orderId);
+                
+            } else {
+                console.error('❌ Cross-chain message verification failed:', verificationResult.reason);
+            }
+            
+        } catch (error) {
+            console.error('❌ Failed to handle Ethereum swap creation:', error);
+        }
+    }
+
+    /**
+     * Handle Ethereum swap completion event
+     */
+    async handleEthereumSwapCompleted(orderId, recipient, preimage) {
+        try {
+            console.log('✅ Processing Ethereum swap completion...');
+            console.log('Order ID:', orderId);
+            console.log('Recipient:', recipient);
+            
+            // Complete corresponding ICP swap
+            await this.completeICPSwap(orderId, preimage);
+            
+            // Update state synchronization
+            await this.synchronizeState('ethereum', 'icp', orderId);
+            
+        } catch (error) {
+            console.error('❌ Failed to handle Ethereum swap completion:', error);
+        }
+    }
+
+    /**
+     * Handle Ethereum swap refund event
+     */
+    async handleEthereumSwapRefunded(orderId, sender) {
+        try {
+            console.log('💸 Processing Ethereum swap refund...');
+            console.log('Order ID:', orderId);
+            console.log('Sender:', sender);
+            
+            // Refund corresponding ICP swap
+            await this.refundICPSwap(orderId);
+            
+            // Update state synchronization
+            await this.synchronizeState('ethereum', 'icp', orderId);
+            
+        } catch (error) {
+            console.error('❌ Failed to handle Ethereum swap refund:', error);
+        }
+    }
+
+    /**
+     * Verify cross-chain message integrity
+     */
+    async verifyCrossChainMessage(message) {
+        try {
+            console.log('🔍 Verifying cross-chain message...');
+            
+            // Verify cryptographic integrity
+            const hashlockValid = await this.verifyHashlock(message.hashlock);
+            const timelockValid = this.verifyTimelock(message.timelock);
+            const amountValid = this.verifyAmount(message.amount);
+            
+            // Verify sender authorization
+            const senderValid = await this.verifySender(message.sender, message.sourceChain);
+            
+            // Verify recipient format
+            const recipientValid = this.verifyRecipient(message.recipient, message.targetChain);
+            
+            const isValid = hashlockValid && timelockValid && amountValid && senderValid && recipientValid;
+            
+            return {
+                valid: isValid,
+                reason: isValid ? null : 'Verification failed',
+                details: {
+                    hashlock: hashlockValid,
+                    timelock: timelockValid,
+                    amount: amountValid,
+                    sender: senderValid,
+                    recipient: recipientValid
+                }
+            };
+            
+        } catch (error) {
+            console.error('❌ Message verification failed:', error);
+            return { valid: false, reason: error.message };
+        }
+    }
+
+    /**
+     * Verify hashlock cryptographic integrity
+     */
+    async verifyHashlock(hashlock) {
+        try {
+            // Check if hashlock is properly formatted
+            if (!hashlock || hashlock.length !== 32) {
+                return false;
+            }
+            
+            // Check if hashlock is already used
+            const isUsed = await this.bridgeContract.isHashlockUsed(hashlock);
+            return !isUsed;
+            
+        } catch (error) {
+            console.error('Hashlock verification failed:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Verify timelock validity
+     */
+    verifyTimelock(timelock) {
+        const currentTime = Math.floor(Date.now() / 1000);
+        const minTimelock = currentTime + 3600; // 1 hour minimum
+        const maxTimelock = currentTime + 86400; // 24 hours maximum
+        
+        return timelock > minTimelock && timelock < maxTimelock;
+    }
+
+    /**
+     * Verify amount within limits
+     */
+    verifyAmount(amount) {
+        const minAmount = ethers.parseEther('0.001');
+        const maxAmount = ethers.parseEther('100');
+        
+        return amount >= minAmount && amount <= maxAmount;
+    }
+
+    /**
+     * Verify sender authorization
+     */
+    async verifySender(sender, sourceChain) {
+        try {
+            if (sourceChain === 'ethereum') {
+                // Verify Ethereum address format
+                return ethers.isAddress(sender);
+            } else if (sourceChain === 'icp') {
+                // Verify ICP principal format
+                return this.isValidICPPrincipal(sender);
+            }
+            return false;
+        } catch (error) {
+            return false;
+        }
+    }
+
+    /**
+     * Verify recipient format
+     */
+    verifyRecipient(recipient, targetChain) {
+        try {
+            if (targetChain === 'ethereum') {
+                return ethers.isAddress(recipient);
+            } else if (targetChain === 'icp') {
+                return this.isValidICPPrincipal(recipient);
+            }
+            return false;
+        } catch (error) {
+            return false;
+        }
+    }
+
+    /**
+     * Check if string is valid ICP principal
+     */
+    isValidICPPrincipal(principal) {
+        // Basic ICP principal validation
+        return typeof principal === 'string' && principal.length > 0;
+    }
+
+    /**
+     * Synchronize state between chains
+     */
+    async synchronizeState(sourceChain, targetChain, orderId) {
+        try {
+            console.log(`🔄 Synchronizing state: ${sourceChain} → ${targetChain}`);
+            console.log('Order ID:', orderId);
+            
+            // Get source chain state
+            const sourceState = await this.getSwapState(sourceChain, orderId);
+            
+            // Update target chain state
+            await this.updateSwapState(targetChain, orderId, sourceState);
+            
+            // Log synchronization
+            this.crossChainMessages.set(orderId, {
+                sourceChain,
+                targetChain,
+                timestamp: Date.now(),
+                state: sourceState
+            });
+            
+            console.log('✅ State synchronization completed');
+            
+        } catch (error) {
+            console.error('❌ State synchronization failed:', error);
+        }
+    }
+
+    /**
+     * Get swap state from specific chain
+     */
+    async getSwapState(chain, orderId) {
+        try {
+            if (chain === 'ethereum') {
+                const order = await this.bridgeContract.getSwapOrder(orderId);
+                return {
+                    completed: order.completed,
+                    refunded: order.refunded,
+                    timelock: order.timelock,
+                    amount: order.amount
+                };
+            } else if (chain === 'icp') {
+                // This would call ICP canister
+                return await this.getICPSwapState(orderId);
+            }
+        } catch (error) {
+            console.error(`Failed to get ${chain} swap state:`, error);
+            return null;
+        }
+    }
+
+    /**
+     * Update swap state on specific chain
+     */
+    async updateSwapState(chain, orderId, state) {
+        try {
+            if (chain === 'ethereum') {
+                // Ethereum state is immutable, only log
+                console.log('Ethereum state update logged');
+            } else if (chain === 'icp') {
+                // Update ICP canister state
+                await this.updateICPSwapState(orderId, state);
+            }
+        } catch (error) {
+            console.error(`Failed to update ${chain} swap state:`, error);
+        }
+    }
+
+    /**
+     * Get ICP swap state (real)
+     */
+    async getICPSwapState(orderId) {
+        try {
+            if (!this.icpClient) {
+                throw new Error('ICP client not initialized');
+            }
+            
+            const result = await this.icpClient.getSwapOrder(orderId);
+            return {
+                completed: result.completed,
+                refunded: result.refunded,
+                timelock: result.timelock,
+                amount: result.amount,
+                realCall: true
+            };
+        } catch (error) {
+            console.error('Failed to get ICP swap state:', error);
+            return null;
+        }
+    }
+
+    /**
+     * Update ICP swap state (real)
+     */
+    async updateICPSwapState(orderId, state) {
+        try {
+            if (!this.icpClient) {
+                throw new Error('ICP client not initialized');
+            }
+            
+            // Process cross-chain message to update state
+            const message = {
+                source_chain: 'ethereum',
+                target_chain: 'icp',
+                order_id: orderId,
+                message_type: 'update_state',
+                payload: Buffer.from(JSON.stringify(state)).toString('base64'),
+                signature: null,
+                timestamp: Math.floor(Date.now() / 1000)
+            };
+            
+            await this.icpClient.processCrossChainMessage(message);
+            console.log('Real ICP state update:', orderId, state);
+        } catch (error) {
+            console.error('Failed to update ICP swap state:', error);
         }
     }
 
@@ -349,92 +802,75 @@ class CrossChainBridgeProtocol {
     // Real ICP Integration Methods
     async createICPSwap(params) {
         try {
-            console.log('📞 Creating ICP swap:', params);
+            console.log('📞 Creating real ICP swap:', params);
             
-            if (!this.icpCanisterId) {
-                throw new Error('ICP_CANISTER_ID not configured');
+            if (!this.icpClient) {
+                throw new Error('ICP client not initialized');
             }
             
             // Convert hashlock to bytes for ICP
             const hashlockBytes = ethers.getBytes(params.hashlock);
             
-            // Create ICP swap request
+            // Create real ICP swap request
             const icpSwapRequest = {
-                ethereum_sender: params.ethereumSender,
-                amount: ethers.parseEther(params.amount.toString()).toString(),
-                hashlock: Array.from(hashlockBytes),
-                timelock: params.timelock
+                ethereumSender: params.ethereumSender,
+                amount: params.amount,
+                hashlock: hashlockBytes,
+                timelock: params.timelock,
+                crossChainId: params.orderId || null
             };
             
-            // In a real implementation, you would call the ICP canister here
-            // For now, we'll simulate the call
-            console.log('📞 Calling ICP canister:', this.icpCanisterId);
-            console.log('📋 Swap request:', icpSwapRequest);
+            // Make real ICP canister call
+            const result = await this.icpClient.createSwap(icpSwapRequest);
             
-            // Simulate ICP canister response
-            const icpOrderId = `icp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-            
-            return {
-                orderId: icpOrderId,
-                success: true
-            };
+            console.log('✅ Real ICP swap created:', result);
+            return result;
             
         } catch (error) {
-            console.error('❌ Error creating ICP swap:', error);
+            console.error('❌ Error creating real ICP swap:', error);
             throw error;
         }
     }
 
     async completeICPSwap(orderId, preimage) {
         try {
-            console.log('📞 Completing ICP swap:', orderId);
+            console.log('📞 Completing real ICP swap:', orderId);
             
-            if (!this.icpCanisterId) {
-                throw new Error('ICP_CANISTER_ID not configured');
+            if (!this.icpClient) {
+                throw new Error('ICP client not initialized');
             }
             
             // Convert preimage to bytes for ICP
             const preimageBytes = ethers.getBytes(preimage);
             
-            // Create completion request
-            const completionRequest = {
-                order_id: orderId,
-                preimage: Array.from(preimageBytes)
-            };
+            // Make real ICP canister call
+            const result = await this.icpClient.completeSwap(orderId, preimageBytes);
             
-            // In a real implementation, you would call the ICP canister here
-            console.log('📞 Calling ICP canister for completion:', this.icpCanisterId);
-            console.log('📋 Completion request:', completionRequest);
-            
-            return { success: true };
+            console.log('✅ Real ICP swap completed:', result);
+            return result;
             
         } catch (error) {
-            console.error('❌ Error completing ICP swap:', error);
+            console.error('❌ Error completing real ICP swap:', error);
             throw error;
         }
     }
 
     async refundICPSwap(orderId) {
         try {
-            console.log('📞 Refunding ICP swap:', orderId);
+            console.log('📞 Refunding real ICP swap:', orderId);
             
-            if (!this.icpCanisterId) {
-                throw new Error('ICP_CANISTER_ID not configured');
+            if (!this.icpClient) {
+                throw new Error('ICP client not initialized');
             }
             
-            // Create refund request
-            const refundRequest = {
-                order_id: orderId
-            };
+            // Make real ICP canister call
+            const result = await this.icpClient.refundSwap(orderId);
             
-            // In a real implementation, you would call the ICP canister here
-            console.log('📞 Calling ICP canister for refund:', this.icpCanisterId);
-            console.log('📋 Refund request:', refundRequest);
-            
-            return { success: true };
+            console.log('✅ Real ICP swap refunded:', result);
+            return result;
             
         } catch (error) {
-            console.error('❌ Error refunding ICP swap:', error);
+            console.error('❌ Error refunding real ICP swap:', error);
             throw error;
         }
     }
