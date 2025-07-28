@@ -1,10 +1,8 @@
 use candid::{CandidType, Deserialize, Principal};
-use ic_cdk::api::management_canister::ecdsa::{
-    sign_with_ecdsa, EcdsaKeyId, EcdsaPublicKeyArgument, SignWithEcdsaArgument,
-};
-use ic_cdk::api::management_canister::main::{
-    canister_status, CanisterIdRecord, CanisterStatusResponse,
-};
+// Chain Fusion imports (commented out until actual implementation)
+// use ic_cdk::api::management_canister::ecdsa::{
+//     sign_with_ecdsa, EcdsaKeyId, EcdsaPublicKeyArgument, SignWithEcdsaArgument,
+// };
 use ic_cdk::{init, query, update};
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -52,6 +50,7 @@ pub struct BridgeConfig {
     pub min_swap_amount: u64,
     pub max_swap_amount: u64,
     pub authorized_resolvers: Vec<Principal>,
+    pub ethereum_contract_address: String,
 }
 
 impl Default for BridgeConfig {
@@ -61,6 +60,7 @@ impl Default for BridgeConfig {
             min_swap_amount: 1_000_000_000_000_000, // 0.001 ICP in e8s
             max_swap_amount: 1_000_000_000_000_000_000, // 1 ICP in e8s (reduced from 100)
             authorized_resolvers: vec![],
+            ethereum_contract_address: String::new(),
         }
     }
 }

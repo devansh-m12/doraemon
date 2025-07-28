@@ -68,9 +68,62 @@ sh -ci "$(curl -fsSL https://internetcomputer.org/install.sh)"
 source "$HOME/Library/Application Support/org.dfinity.dfx/env"
 
 # Set up environment variables
-cp .env.example .env
+cp env.example .env
 # Edit .env with your configuration
 ```
+
+## 🌐 Network Configuration
+
+This project supports both **Local Hardhat Network** and **Sepolia Testnet** for development and testing.
+
+### Network Options
+
+| Network | Chain ID | Use Case | Advantages |
+|---------|----------|----------|------------|
+| **Local** | 1337 | Development, testing | Fast, free, no external dependencies |
+| **Sepolia** | 11155111 | Integration testing | Realistic environment, persistent |
+
+### Quick Network Setup
+
+```bash
+# Show current network configuration
+node scripts/network-config.js show
+
+# Switch to local network
+node scripts/network-config.js switch local
+
+# Switch to Sepolia network
+node scripts/network-config.js switch sepolia
+
+# Validate configuration
+node scripts/network-config.js validate
+
+# Run network demo
+node scripts/demo-networks.js demo
+```
+
+### Available Scripts
+
+```bash
+# Contract deployment
+npm run deploy:local      # Deploy to local network
+npm run deploy:sepolia    # Deploy to Sepolia network
+
+# Bridge operations
+npm run start:local       # Start bridge on local network
+npm run start:sepolia     # Start bridge on Sepolia network
+
+# Testing
+npm run test:bridge:local # Test bridge on local network
+npm run test:bridge:sepolia # Test bridge on Sepolia network
+
+# Development tools
+npm run node:start        # Start local Hardhat node
+npm run compile           # Compile contracts
+npm run clean             # Clean build artifacts
+```
+
+For detailed network setup instructions, see [NETWORK_SETUP.md](./NETWORK_SETUP.md).
 
 ### Development Setup
 

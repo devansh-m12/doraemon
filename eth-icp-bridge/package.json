@@ -6,9 +6,23 @@
   "directories": {
     "doc": "docs"
   },
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
+      "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "setup:local": "node scripts/setup-env.js local",
+        "setup:sepolia": "node scripts/setup-env.js sepolia",
+        "deploy:local": "cd ethereum-contracts && npm run deploy:local",
+        "deploy:sepolia": "cd ethereum-contracts && npm run deploy:sepolia",
+        "start:local": "node scripts/bridge-protocol.js local",
+        "start:sepolia": "node scripts/bridge-protocol.js sepolia",
+        "test:bridge:local": "node scripts/test-implementations.js local",
+        "test:bridge:sepolia": "node scripts/test-implementations.js sepolia",
+        "test:fusion:local": "node scripts/test-fusion-local.js",
+        "check:local": "node scripts/check-contract-state.js local",
+        "check:sepolia": "node scripts/check-contract-state.js sepolia",
+        "node:start": "cd ethereum-contracts && npm run node",
+        "compile": "cd ethereum-contracts && npm run compile",
+        "clean": "cd ethereum-contracts && npm run clean"
+    },
   "keywords": [],
   "author": "",
   "license": "ISC",
