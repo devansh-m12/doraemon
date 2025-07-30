@@ -1,280 +1,246 @@
-import { Actor, HttpAgent } from '@dfinity/agent';
-import { Ed25519KeyIdentity } from '@dfinity/identity';
-import { Principal } from '@dfinity/principal';
-import { idlFactory as icrc1LedgerIdlFactory } from '../src/declarations/icrc1_ledger_canister';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 
-// Load environment variables
-require('dotenv').config();
+const execAsync = promisify(exec);
 
-export interface TokenTransferResult {
-  success: boolean;
-  transactionId?: bigint;
-  error?: string;
+export interface OrderConfig {
+  id: number;
+  src_mint: string;
+  dst_mint: string;
+  maker: string;
+  src_amount: number;
+  min_dst_amount: number;
+  estimated_dst_amount: number;
+  expiration_time: number;
+  fee: {
+    protocol_fee_bps: number;
+    integrator_fee_bps: number;
+    surplus_bps: number;
+    max_cancel_premium: number;
+  };
+  auction: {
+    start_time: number;
+    end_time: number;
+    start_price: number;
+    end_price: number;
+    current_price: number;
+  };
+  cancellation_auction_secs: number;
 }
 
-export interface TokenBalance {
-  owner: string;
-  balance: bigint;
+export interface CreateOrderResult {
+  success: boolean;
+  orderId?: number;
+  error?: string;
+  transactionId?: string;
 }
 
 export class TokenUtils {
-  private icrc1LedgerActor: any;
-  private agent: HttpAgent;
+  private fusionSwapCanisterId: string;
+  private icrc1CanisterId: string;
 
   constructor() {
-    this.agent = new HttpAgent({
-      host: process.env.TEST_HOST || 'http://127.0.0.1:4943',
-    });
-    
-    // Disable certificate verification for local testing
-    this.agent.fetchRootKey = () => Promise.resolve(new ArrayBuffer(0));
-    
-    const canisterId = process.env.CANISTER_ID_ICRC1_LEDGER_CANISTER!;
-    this.icrc1LedgerActor = Actor.createActor(icrc1LedgerIdlFactory, {
-      agent: this.agent,
-      canisterId,
-    });
+    this.fusionSwapCanisterId = 'br5f7-7uaaa-aaaaa-qaaca-cai';
+    this.icrc1CanisterId = 'b77ix-eeaaa-aaaaa-qaada-cai';
   }
 
   /**
-   * Get token information
+   * Creates an order using dfx terminal commands
+   * @param orderConfig The order configuration
+   * @param identity The dfx identity to use (e.g., 'test-maker', 'test-taker')
+   * @returns Promise<CreateOrderResult>
    */
-  async getTokenInfo() {
-    const [name, symbol, totalSupply, fee, decimals] = await Promise.all([
-      this.icrc1LedgerActor.icrc1_name(),
-      this.icrc1LedgerActor.icrc1_symbol(),
-      this.icrc1LedgerActor.icrc1_total_supply(),
-      this.icrc1LedgerActor.icrc1_fee(),
-      this.icrc1LedgerActor.icrc1_decimals(),
-    ]);
-
-    return {
-      name,
-      symbol,
-      totalSupply,
-      fee,
-      decimals,
-    };
-  }
-
-  /**
-   * Get balance for a specific account
-   */
-  async getBalance(owner: string): Promise<bigint> {
-    const balance = await this.icrc1LedgerActor.icrc1_balance_of({
-      owner: Principal.fromText(owner),
-      subaccount: []
-    });
-    return balance;
-  }
-
-  /**
-   * Transfer tokens from one account to another
-   */
-  async transferTokens(
-    from: string,
-    to: string,
-    amount: bigint,
-    fee?: bigint
-  ): Promise<TokenTransferResult> {
+  async createOrderWithDfx(orderConfig: OrderConfig, identity: string): Promise<CreateOrderResult> {
     try {
-      const transferResult = await this.icrc1LedgerActor.icrc1_transfer({
-        from_subaccount: [],
-        to: {
-          owner: Principal.fromText(to),
-          subaccount: []
-        },
-        amount,
-        fee: fee ? [fee] : [],
-        memo: [],
-        created_at_time: []
-      });
+      // Switch to the specified identity
+      console.log(`Switching to identity: ${identity}`);
+      await execAsync(`dfx identity use ${identity}`);
+      
+      // Check if identity has balance
+      const balanceCheck = await execAsync(`dfx canister call ${this.icrc1CanisterId} icrc1_balance_of '(record { owner = principal "${orderConfig.maker}"; subaccount = null })'`);
+      console.log(`Balance check result: ${balanceCheck.stdout}`);
 
-      if ('Ok' in transferResult) {
-        return {
-          success: true,
-          transactionId: transferResult.Ok,
-        };
-      } else {
-        return {
-          success: false,
-          error: JSON.stringify(transferResult.Err),
-        };
-      }
+      // Approve tokens for the contract if needed
+      console.log('Approving tokens for contract...');
+      const approveResult = await execAsync(`dfx canister call ${this.icrc1CanisterId} icrc2_approve '(record { from_subaccount = null; spender = record { owner = principal "${this.fusionSwapCanisterId}"; subaccount = null }; amount = ${orderConfig.src_amount + 10000000} : nat; expires_at = null })'`);
+      console.log(`Approve result: ${approveResult.stdout}`);
+
+      // Create the order using dfx
+      console.log(`Creating order with ID: ${orderConfig.id}`);
+      const createOrderCommand = `dfx canister call ${this.fusionSwapCanisterId} create_order '(record { id = ${orderConfig.id} : nat64; src_mint = principal "${orderConfig.src_mint}"; dst_mint = principal "${orderConfig.dst_mint}"; maker = principal "${orderConfig.maker}"; src_amount = ${orderConfig.src_amount} : nat; min_dst_amount = ${orderConfig.min_dst_amount} : nat; estimated_dst_amount = ${orderConfig.estimated_dst_amount} : nat; expiration_time = ${orderConfig.expiration_time} : nat64; fee = record { protocol_fee_bps = ${orderConfig.fee.protocol_fee_bps} : nat16; integrator_fee_bps = ${orderConfig.fee.integrator_fee_bps} : nat16; surplus_bps = ${orderConfig.fee.surplus_bps} : nat8; max_cancel_premium = ${orderConfig.fee.max_cancel_premium} : nat }; auction = record { start_time = ${orderConfig.auction.start_time} : nat64; end_time = ${orderConfig.auction.end_time} : nat64; start_price = ${orderConfig.auction.start_price} : nat; end_price = ${orderConfig.auction.end_price} : nat; current_price = ${orderConfig.auction.current_price} : nat }; cancellation_auction_secs = ${orderConfig.cancellation_auction_secs} : nat32 })'`;
+
+      const createResult = await execAsync(createOrderCommand);
+      console.log(`Order creation result: ${createResult.stdout}`);
+
+      // Verify the order was created
+      console.log('Verifying order creation...');
+      const verifyResult = await execAsync(`dfx canister call ${this.fusionSwapCanisterId} get_order '(${orderConfig.id} : nat64)'`);
+      console.log(`Verification result: ${verifyResult.stdout}`);
+
+      return {
+        success: true,
+        orderId: orderConfig.id,
+        transactionId: createResult.stdout
+      };
+
     } catch (error) {
+      console.error('Error creating order:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.message : String(error)
       };
     }
   }
 
   /**
-   * Approve tokens for transfer_from operations
+   * Creates a test order with default parameters
+   * @param orderId The order ID to use
+   * @param identity The dfx identity to use
+   * @returns Promise<CreateOrderResult>
    */
-  async approveTokens(
-    owner: string,
-    spender: string,
-    amount: bigint,
-    fee?: bigint
-  ): Promise<TokenTransferResult> {
-    try {
-      const approveResult = await this.icrc1LedgerActor.icrc2_approve({
-        from_subaccount: [],
-        spender: {
-          owner: Principal.fromText(spender),
-          subaccount: []
-        },
-        amount,
-        expires_at: [],
-        fee: fee ? [fee] : [],
-        memo: [],
-        created_at_time: []
-      });
-
-      if ('Ok' in approveResult) {
-        return {
-          success: true,
-          transactionId: approveResult.Ok,
-        };
-      } else {
-        return {
-          success: false,
-          error: JSON.stringify(approveResult.Err),
-        };
-      }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      };
-    }
-  }
-
-  /**
-   * Transfer tokens using approve/transfer_from pattern
-   */
-  async transferFromTokens(
-    spender: string,
-    from: string,
-    to: string,
-    amount: bigint,
-    fee?: bigint
-  ): Promise<TokenTransferResult> {
-    try {
-      const transferFromResult = await this.icrc1LedgerActor.icrc2_transfer_from({
-        spender_subaccount: [],
-        from: {
-          owner: Principal.fromText(from),
-          subaccount: []
-        },
-        to: {
-          owner: Principal.fromText(to),
-          subaccount: []
-        },
-        amount,
-        fee: fee ? [fee] : [],
-        memo: [],
-        created_at_time: []
-      });
-
-      if ('Ok' in transferFromResult) {
-        return {
-          success: true,
-          transactionId: transferFromResult.Ok,
-        };
-      } else {
-        return {
-          success: false,
-          error: JSON.stringify(transferFromResult.Err),
-        };
-      }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      };
-    }
-  }
-
-  /**
-   * Get allowance for a spender
-   */
-  async getAllowance(owner: string, spender: string): Promise<bigint> {
-    const allowance = await this.icrc1LedgerActor.icrc2_allowance({
-      account: {
-        owner: Principal.fromText(owner),
-        subaccount: []
+  async createTestOrder(orderId: number, identity: string): Promise<CreateOrderResult> {
+    const testOrderConfig: OrderConfig = {
+      id: orderId,
+      src_mint: this.icrc1CanisterId,
+      dst_mint: this.icrc1CanisterId,
+      maker: this.getMakerPrincipal(identity),
+      src_amount: 1000000000, // 1 billion tokens
+      min_dst_amount: 900000000, // 900 million tokens
+      estimated_dst_amount: 1000000000, // 1 billion tokens
+      expiration_time: 1735689600, // January 1, 2025
+      fee: {
+        protocol_fee_bps: 30,
+        integrator_fee_bps: 20,
+        surplus_bps: 10,
+        max_cancel_premium: 100000000
       },
-      spender: {
-        owner: Principal.fromText(spender),
-        subaccount: []
-      }
-    });
-    return allowance.allowance;
+      auction: {
+        start_time: 1735689600,
+        end_time: 1735776000,
+        start_price: 1000000000,
+        end_price: 900000000,
+        current_price: 1000000000
+      },
+      cancellation_auction_secs: 3600
+    };
+
+    return this.createOrderWithDfx(testOrderConfig, identity);
   }
 
   /**
-   * Get balances for multiple accounts
+   * Gets the maker principal based on identity
+   * @param identity The dfx identity name
+   * @returns The principal string
    */
-  async getBalances(accounts: string[]): Promise<TokenBalance[]> {
-    const balancePromises = accounts.map(async (owner) => {
-      const balance = await this.getBalance(owner);
-      return { owner, balance };
-    });
+  private getMakerPrincipal(identity: string): string {
+    const principals: { [key: string]: string } = {
+      'test-maker': 'cjobn-a4566-qzwux-yg5b5-z2vqh-huolu-nhxd6-6xrto-zunsj-zuwdd-qae',
+      'test-taker': 'fhrni-ukyxj-tns4p-l7f32-txwvg-anu57-55dcm-gzhue-22yg2-qokvv-mqe',
+      'default': 'vz5cd-iuzeq-n2hg6-kzzzy-4dj3b-pcg4o-puhec-2irm3-wb677-6dl5i-zqe'
+    };
 
-    return Promise.all(balancePromises);
+    return principals[identity] || principals['default'];
   }
 
   /**
-   * Distribute tokens from minting account to test accounts
+   * Verifies an order exists
+   * @param orderId The order ID to verify
+   * @returns Promise<boolean>
    */
-  async distributeTestTokens(): Promise<void> {
-    const mintingAccount = '2vxsx-fae';
-    const testAccounts = [
-      process.env.TEST_MAKER_PRINCIPAL!,
-      process.env.TEST_TAKER_PRINCIPAL!,
-      process.env.TEST_RESOLVER_PRINCIPAL!,
-    ];
-
-    const distributionAmount = BigInt(1_000_000_000); // 1 billion tokens each
-
-    for (const account of testAccounts) {
-      const result = await this.transferTokens(mintingAccount, account, distributionAmount);
-      if (!result.success) {
-        console.error(`Failed to distribute tokens to ${account}:`, result.error);
-      } else {
-        console.log(`Successfully distributed ${distributionAmount} tokens to ${account}`);
-      }
+  async verifyOrder(orderId: number): Promise<boolean> {
+    try {
+      const result = await execAsync(`dfx canister call ${this.fusionSwapCanisterId} get_order '(${orderId} : nat64)'`);
+      const orderData = result.stdout.trim();
+      return orderData !== '(null)' && orderData !== '[]';
+    } catch (error) {
+      console.error('Error verifying order:', error);
+      return false;
     }
   }
 
   /**
-   * Print current token state
+   * Gets all orders
+   * @returns Promise<string>
    */
-  async printTokenState(): Promise<void> {
-    const tokenInfo = await this.getTokenInfo();
-    console.log('=== Token Information ===');
-    console.log(`Name: ${tokenInfo.name}`);
-    console.log(`Symbol: ${tokenInfo.symbol}`);
-    console.log(`Total Supply: ${tokenInfo.totalSupply}`);
-    console.log(`Transfer Fee: ${tokenInfo.fee}`);
-    console.log(`Decimals: ${tokenInfo.decimals}`);
+  async getAllOrders(): Promise<string> {
+    try {
+      const result = await execAsync(`dfx canister call ${this.fusionSwapCanisterId} get_all_orders`);
+      return result.stdout;
+    } catch (error) {
+      console.error('Error getting all orders:', error);
+      return '';
+    }
+  }
 
-    const testAccounts = [
-      '2vxsx-fae', // minting account
-      process.env.TEST_MAKER_PRINCIPAL!,
-      process.env.TEST_TAKER_PRINCIPAL!,
-      process.env.TEST_RESOLVER_PRINCIPAL!,
-    ];
+  /**
+   * Gets orders by maker
+   * @param makerPrincipal The maker principal
+   * @returns Promise<string>
+   */
+  async getOrdersByMaker(makerPrincipal: string): Promise<string> {
+    try {
+      const result = await execAsync(`dfx canister call ${this.fusionSwapCanisterId} get_orders_by_maker '(principal "${makerPrincipal}")'`);
+      return result.stdout;
+    } catch (error) {
+      console.error('Error getting orders by maker:', error);
+      return '';
+    }
+  }
 
-    const balances = await this.getBalances(testAccounts);
-    console.log('\n=== Account Balances ===');
-    for (const { owner, balance } of balances) {
-      console.log(`${owner}: ${balance} tokens`);
+  /**
+   * Transfers tokens to an account
+   * @param fromIdentity The identity to transfer from
+   * @param toPrincipal The recipient principal
+   * @param amount The amount to transfer
+   * @returns Promise<boolean>
+   */
+  async transferTokens(fromIdentity: string, toPrincipal: string, amount: number): Promise<boolean> {
+    try {
+      // Switch to the from identity
+      await execAsync(`dfx identity use ${fromIdentity}`);
+      
+      // Get the from principal
+      const fromPrincipalResult = await execAsync('dfx identity get-principal');
+      const fromPrincipal = fromPrincipalResult.stdout.trim();
+
+      // Transfer tokens
+      const transferCommand = `dfx canister call ${this.icrc1CanisterId} icrc1_transfer '(record { from = record { owner = principal "${fromPrincipal}"; subaccount = null }; to = record { owner = principal "${toPrincipal}"; subaccount = null }; amount = ${amount} : nat; fee = null; memo = null; created_at_time = null })'`;
+      
+      const result = await execAsync(transferCommand);
+      console.log(`Transfer result: ${result.stdout}`);
+      
+      return result.stdout.includes('Ok');
+    } catch (error) {
+      console.error('Error transferring tokens:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Approves tokens for a spender
+   * @param identity The identity to approve from
+   * @param spenderPrincipal The spender principal
+   * @param amount The amount to approve
+   * @returns Promise<boolean>
+   */
+  async approveTokens(identity: string, spenderPrincipal: string, amount: number): Promise<boolean> {
+    try {
+      // Switch to the identity
+      await execAsync(`dfx identity use ${identity}`);
+      
+      // Approve tokens
+      const approveCommand = `dfx canister call ${this.icrc1CanisterId} icrc2_approve '(record { from_subaccount = null; spender = record { owner = principal "${spenderPrincipal}"; subaccount = null }; amount = ${amount} : nat; expires_at = null })'`;
+      
+      const result = await execAsync(approveCommand);
+      console.log(`Approve result: ${result.stdout}`);
+      
+      return result.stdout.includes('Ok');
+    } catch (error) {
+      console.error('Error approving tokens:', error);
+      return false;
     }
   }
 }
 
 // Export a singleton instance
-export const tokenUtils = new TokenUtils(); 
+export const tokenUtils = new TokenUtils();
