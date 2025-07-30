@@ -1,0 +1,17 @@
+{
+  "name": "fusion_swap_icp",
+  "version": "1.0.0",
+  "description": "A Rust-based Internet Computer (ICP) canister that implements an escrow and Dutch auction swap system, similar to Solana's fusion-swap but built for the Internet Computer.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@dfinity/pic": "^0.13.1",
+    "jest": "^29.7.0"
+  }
+}

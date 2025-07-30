@@ -1,0 +1,18 @@
+[package]
+name = "fusion_swap_icp_backend"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+candid = "0.10"
+ic-cdk = "0.13"
+ic-cdk-macros = "0.8"
+serde = { version = "1.0", features = ["derive"] }
+icrc-ledger-types = "0.1.10"
+ic-stable-structures = "0.7.0"
+ic-cdk-timers = "0.7" # Feel free to remove this dependency if you don't need timers
