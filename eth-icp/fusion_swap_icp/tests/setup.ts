@@ -10,8 +10,8 @@ const originalConsoleError = console.error;
 
 beforeAll(() => {
   // Suppress console output during tests unless explicitly needed
-  console.log = jest.fn();
-  console.error = jest.fn();
+  // console.log = jest.fn();
+  // console.error = jest.fn();
 });
 
 afterAll(() => {

@@ -35,6 +35,13 @@ export interface CreateOrderResult {
   transactionId?: string;
 }
 
+export interface FillOrderResult {
+  success: boolean;
+  orderId?: number;
+  error?: string;
+  transactionId?: string;
+}
+
 export class TokenUtils {
   private fusionSwapCanisterId: string;
   private icrc1CanisterId: string;
@@ -213,6 +220,56 @@ export class TokenUtils {
     } catch (error) {
       console.error('Error transferring tokens:', error);
       return false;
+    }
+  }
+
+  /**
+   * Fills an order using dfx terminal commands
+   * @param orderId The order ID to fill
+   * @param amount The amount to fill
+   * @param identity The dfx identity to use (e.g., 'test-taker')
+   * @returns Promise<FillOrderResult>
+   */
+  async fillOrderWithDfx(orderId: number, amount: number, identity: string): Promise<FillOrderResult> {
+    try {
+      // Switch to the specified identity
+      console.log(`Switching to identity: ${identity}`);
+      await execAsync(`dfx identity use ${identity}`);
+      
+      // Check if identity has balance
+      const takerPrincipal = this.getMakerPrincipal(identity);
+      const balanceCheck = await execAsync(`dfx canister call ${this.icrc1CanisterId} icrc1_balance_of '(record { owner = principal "${takerPrincipal}"; subaccount = null })'`);
+      console.log(`Balance check result: ${balanceCheck.stdout}`);
+
+      // Approve tokens for the contract if needed
+      console.log('Approving tokens for contract...');
+      const approveResult = await execAsync(`dfx canister call ${this.icrc1CanisterId} icrc2_approve '(record { from_subaccount = null; spender = record { owner = principal "${this.fusionSwapCanisterId}"; subaccount = null }; amount = ${amount + 10000000} : nat; expires_at = null })'`);
+      console.log(`Approve result: ${approveResult.stdout}`);
+
+      // Fill the order using dfx
+      console.log(`Filling order ${orderId} with amount ${amount}...`);
+      const fillOrderCommand = `dfx canister call ${this.fusionSwapCanisterId} fill_order '(${orderId}, ${amount})'`;
+
+      const fillResult = await execAsync(fillOrderCommand);
+      console.log(`Fill order result: ${fillResult.stdout}`);
+
+      // Verify the order was filled by checking if it still exists
+      console.log('Verifying order fill...');
+      const verifyResult = await execAsync(`dfx canister call ${this.fusionSwapCanisterId} get_order '(${orderId} : nat64)'`);
+      console.log(`Verification result: ${verifyResult.stdout}`);
+
+      return {
+        success: true,
+        orderId: orderId,
+        transactionId: fillResult.stdout
+      };
+
+    } catch (error) {
+      console.error('Error filling order:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      };
     }
   }
 
