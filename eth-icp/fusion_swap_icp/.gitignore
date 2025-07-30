@@ -1,0 +1,17 @@
+/target
+
+/node_modules
+/dist
+/build
+/declarations
+/declarations.did
+/declarations.did.js
+/declarations.did.js.map
+/declarations.did.js.map.gz
+/declarations.did.js.map.gz.br
+/declarations.did.js.map.gz.br.gz
+
+.DS_Store
+/.dfx
+
+/coverage
