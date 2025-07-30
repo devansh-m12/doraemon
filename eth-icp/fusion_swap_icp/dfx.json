@@ -4,6 +4,12 @@
       "candid": "src/fusion_swap_icp_backend/fusion_swap_icp_backend.did",
       "package": "fusion_swap_icp_backend",
       "type": "rust"
+    },
+    "icrc1_ledger_canister": {
+      "type": "custom",
+      "candid": "icrc1_ledger.did",
+      "wasm": "icrc1_ledger.wasm.gz",
+      "init_arg": "(variant { Init = record { token_symbol = \"FUSION\"; token_name = \"Fusion Token\"; minting_account = record { owner = principal \"vz5cd-iuzeq-n2hg6-kzzzy-4dj3b-pcg4o-puhec-2irm3-wb677-6dl5i-zqe\" }; transfer_fee = 10000; metadata = vec {}; feature_flags = opt record { icrc2 = true }; initial_balances = vec { record { record { owner = principal \"vz5cd-iuzeq-n2hg6-kzzzy-4dj3b-pcg4o-puhec-2irm3-wb677-6dl5i-zqe\" }; 1000000000000 } }; archive_options = record { num_blocks_to_archive = 1000; trigger_threshold = 2000; controller_id = principal \"vz5cd-iuzeq-n2hg6-kzzzy-4dj3b-pcg4o-puhec-2irm3-wb677-6dl5i-zqe\"; cycles_for_archive_creation = opt 10000000000000 } } })"
     }
   },
   "defaults": {

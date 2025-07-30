@@ -4,14 +4,32 @@
   "description": "A Rust-based Internet Computer (ICP) canister that implements an escrow and Dutch auction swap system, similar to Solana's fusion-swap but built for the Internet Computer.",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest --runInBand",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:token-transfers": "jest --runInBand tests/icrc1-token-transfer.test.ts",
+    "test:token-script": "ts-node scripts/test-token-transfers.ts",
+    "build": "dfx build",
+    "deploy": "dfx deploy",
+    "start": "dfx start --clean --background"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
+    "@babel/preset-env": "^7.28.0",
+    "@babel/preset-typescript": "^7.27.1",
+    "@dfinity/agent": "^2.4.1",
+    "@dfinity/identity": "^2.4.1",
     "@dfinity/pic": "^0.13.1",
-    "jest": "^29.7.0"
+    "@dfinity/principal": "^2.4.1",
+    "@types/jest": "^30.0.0",
+    "babel-jest": "^29.7.0",
+    "dotenv": "^17.2.1",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.4.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
   }
 }
