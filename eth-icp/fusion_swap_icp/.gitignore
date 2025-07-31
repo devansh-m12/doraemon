@@ -14,3 +14,5 @@
 .DS_Store
 
 /coverage
+# Environment variables
+.env

@@ -1,5 +1,9 @@
 import { tokenUtils, OrderConfig } from './token-utils';
 import { sha256 } from 'js-sha256';
+import * as dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
 
 // Helper function to generate a secret and its hash
 function generateSecretAndHash(): { secret: string; secretHash: number[] } {
@@ -24,11 +28,14 @@ function createFusionOrder(
 
   const currentTime = Math.floor(Date.now() / 1000);
   
+  // Get the actual principal for the maker identity
+  const makerPrincipal = tokenUtils.getMakerPrincipal(maker);
+  
   return {
     id,
-    src_mint: 'b77ix-eeaaa-aaaaa-qaada-cai', // ICRC1 ledger
-    dst_mint: 'b77ix-eeaaa-aaaaa-qaada-cai', // ICRC1 ledger
-    maker,
+    src_mint: process.env.ICRC1_CANISTER_ID || 'br5f7-7uaaa-aaaaa-qaaca-cai', // ICRC1 ledger
+    dst_mint: process.env.ICRC1_CANISTER_ID || 'br5f7-7uaaa-aaaaa-qaaca-cai', // ICRC1 ledger
+    maker: makerPrincipal,
     src_amount: srcAmount,
     min_dst_amount: dstAmount,
     estimated_dst_amount: dstAmount,
@@ -347,8 +354,8 @@ describe('Fusion+ Protocol Tests', () => {
       // Create a basic order (without Fusion+ features)
       const basicOrder: OrderConfig = {
         id: 113,
-        src_mint: 'b77ix-eeaaa-aaaaa-qaada-cai',
-        dst_mint: 'b77ix-eeaaa-aaaaa-qaada-cai',
+                      src_mint: process.env.ICRC1_CANISTER_ID || 'br5f7-7uaaa-aaaaa-qaaca-cai',
+        dst_mint: process.env.ICRC1_CANISTER_ID || 'br5f7-7uaaa-aaaaa-qaaca-cai',
         maker: 'test-maker',
         src_amount: 1000000000,
         min_dst_amount: 900000000,

@@ -1,6 +1,34 @@
 type Amount = nat;
 type Principal = principal;
 
+type FusionError = variant {
+    OrderNotFound;
+    OrderAlreadyExists;
+    InvalidOrderState;
+    OrderExpired;
+    UnauthorizedCaller;
+    InvalidAmount;
+    InvalidTimeRange;
+    InvalidSecret;
+    ReentrancyDetected;
+    InsufficientSafetyDeposit;
+    TimelockViolation;
+    TransferFailed : text;
+};
+
+type HashLock = record {
+    secret_hash : vec nat8;
+    revealed : bool;
+    reveal_time : opt nat64;
+};
+
+type TimeLock = record {
+    finality_lock_duration : nat64;
+    exclusive_withdraw_duration : nat64;
+    cancellation_timeout : nat64;
+    created_at : nat64;
+};
+
 type FeeConfig = record {
     protocol_fee_bps : nat16;
     integrator_fee_bps : nat16;
@@ -16,6 +44,14 @@ type AuctionData = record {
     current_price : Amount;
 };
 
+type OrderStatus = variant {
+    Announced;
+    Active;
+    Completed;
+    Cancelled;
+    Failed : text;
+};
+
 type OrderConfig = record {
     id : nat64;
     src_mint : Principal;
@@ -28,12 +64,21 @@ type OrderConfig = record {
     fee : FeeConfig;
     auction : AuctionData;
     cancellation_auction_secs : nat32;
+    hashlock : HashLock;
+    timelock : TimeLock;
+    status : OrderStatus;
+    created_at : nat64;
+};
+
+type Result = variant {
+    Ok;
+    Err : FusionError;
 };
 
 service : {
-    "create_order": (OrderConfig) -> () oneway;
-    "fill_order": (nat64, Amount) -> () oneway;
-    "cancel_order": (nat64) -> () oneway;
+    "create_order": (OrderConfig) -> (Result);
+    "fill_order": (nat64, Amount, opt vec nat8) -> (Result);
+    "cancel_order": (nat64) -> (Result);
     "get_order": (nat64) -> (opt OrderConfig) query;
     "get_all_orders": () -> (vec OrderConfig) query;
     "get_orders_by_maker": (Principal) -> (vec OrderConfig) query;

@@ -1,6 +1,7 @@
 import { Actor, HttpAgent } from '@dfinity/agent';
 import { Principal } from '@dfinity/principal';
 import { idlFactory as icrc1LedgerIdlFactory } from '../src/declarations/icrc1_ledger_canister';
+import { tokenUtils } from './token-utils';
 
 // Load environment variables
 require('dotenv').config();
@@ -19,7 +20,7 @@ describe('ICRC1 Token Transfer Tests', () => {
     await defaultAgent.fetchRootKey();
     
     // Create ICRC1 ledger actor
-    const canisterId = process.env.CANISTER_ID_ICRC1_LEDGER_CANISTER!;
+    const canisterId = process.env.ICRC1_CANISTER_ID!;
     icrc1LedgerActor = Actor.createActor(icrc1LedgerIdlFactory, {
       agent: defaultAgent,
       canisterId,
@@ -188,6 +189,105 @@ describe('ICRC1 Token Transfer Tests', () => {
       expect(decimals).toBeDefined();
       expect(typeof decimals).toBe('number');
       expect(decimals).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Token Transfer Operations using TokenUtils', () => {
+    it('should transfer tokens between test accounts using TokenUtils', async () => {
+      if (process.env.TEST_MAKER_PRINCIPAL && process.env.TEST_TAKER_PRINCIPAL) {
+        const transferAmount = 100_000_000; // 100M tokens
+        
+        // Transfer tokens from maker to taker
+        const transferSuccess = await tokenUtils.transferTokens(
+          'test-maker',
+          process.env.TEST_TAKER_PRINCIPAL!,
+          transferAmount
+        );
+        
+        expect(transferSuccess).toBe(true);
+        
+        // Verify the transfer by checking balances
+        const makerBalanceAfter = await icrc1LedgerActor.icrc1_balance_of({
+          owner: Principal.fromText(process.env.TEST_MAKER_PRINCIPAL),
+          subaccount: []
+        });
+        
+        const takerBalanceAfter = await icrc1LedgerActor.icrc1_balance_of({
+          owner: Principal.fromText(process.env.TEST_TAKER_PRINCIPAL),
+          subaccount: []
+        });
+        
+        // Taker should have received the tokens (minus transfer fee)
+        expect(takerBalanceAfter).toBeGreaterThan(BigInt(0));
+      }
+    });
+
+    it('should approve tokens for spender using TokenUtils', async () => {
+      if (process.env.TEST_MAKER_PRINCIPAL && process.env.TEST_RESOLVER_PRINCIPAL) {
+        const approveAmount = 1_000_000_000; // 1B tokens
+        
+        // Approve tokens from maker to resolver
+        const approveSuccess = await tokenUtils.approveTokens(
+          'test-maker',
+          process.env.TEST_RESOLVER_PRINCIPAL!,
+          approveAmount
+        );
+        
+        expect(approveSuccess).toBe(true);
+        
+        // Verify the allowance
+        const allowance = await icrc1LedgerActor.icrc2_allowance({
+          account: {
+            owner: Principal.fromText(process.env.TEST_MAKER_PRINCIPAL),
+            subaccount: []
+          },
+          spender: {
+            owner: Principal.fromText(process.env.TEST_RESOLVER_PRINCIPAL),
+            subaccount: []
+          }
+        });
+        
+        expect(allowance.allowance).toBeGreaterThanOrEqual(BigInt(approveAmount));
+      }
+    });
+
+    it('should create and verify test order using TokenUtils', async () => {
+      const testOrderId = Math.floor(Math.random() * 1000000) + 100000; // Random ID between 100000-1099999
+      
+      // Create a test order
+      const createResult = await tokenUtils.createTestOrder(testOrderId, 'test-maker');
+      
+      expect(createResult.success).toBe(true);
+      expect(createResult.orderId).toBe(testOrderId);
+      
+      // Verify the order exists
+      const orderExists = await tokenUtils.verifyOrder(testOrderId);
+      expect(orderExists).toBe(true);
+      
+      // Get the order details
+      const orderDetails = await tokenUtils.getOrder(testOrderId);
+      expect(orderDetails).toBeDefined();
+      expect(orderDetails?.id).toBe(testOrderId);
+      expect(orderDetails?.maker).toBe(tokenUtils.getMakerPrincipal('test-maker'));
+    });
+
+    it('should verify order exists and get order details using TokenUtils', async () => {
+      const testOrderId = Math.floor(Math.random() * 1000000) + 200000; // Random ID between 200000-2099999
+      
+      // First create a test order
+      const createResult = await tokenUtils.createTestOrder(testOrderId, 'test-maker');
+      expect(createResult.success).toBe(true);
+      
+      // Verify the order exists
+      const orderExists = await tokenUtils.verifyOrder(testOrderId);
+      expect(orderExists).toBe(true);
+      
+      // Get the order details
+      const orderDetails = await tokenUtils.getOrder(testOrderId);
+      expect(orderDetails).toBeDefined();
+      expect(orderDetails?.id).toBe(testOrderId);
+      expect(orderDetails?.maker).toBe(tokenUtils.getMakerPrincipal('test-maker'));
+      expect(orderDetails?.status).toBe('Announced');
     });
   });
 }); 

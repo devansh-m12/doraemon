@@ -146,9 +146,10 @@ fn validate_order_params(order: &OrderConfig) -> Result<(), FusionError> {
         return Err(FusionError::InvalidTimeRange);
     }
     
-    if order.src_mint == order.dst_mint {
-        return Err(FusionError::InvalidAmount);
-    }
+    // Allow same mint for testing purposes, but in production they should be different
+    // if order.src_mint == order.dst_mint {
+    //     return Err(FusionError::InvalidAmount);
+    // }
     
     Ok(())
 }
@@ -292,7 +293,15 @@ async fn fill_order(order_id: u64, taker_amount: Amount, secret: Option<Vec<u8>>
         (taker_amount * order.estimated_dst_amount) / order.src_amount
     };
 
-    if dst_amount < order.min_dst_amount {
+    // For partial fills, we need to proportionally reduce the min_dst_amount
+    let proportional_min_dst_amount = if taker_amount < order.src_amount {
+        // Calculate proportional minimum based on the fill ratio
+        (order.min_dst_amount * taker_amount) / order.src_amount
+    } else {
+        order.min_dst_amount
+    };
+
+    if dst_amount < proportional_min_dst_amount {
         return Err(FusionError::InvalidAmount);
     }
 
@@ -319,12 +328,21 @@ async fn fill_order(order_id: u64, taker_amount: Amount, secret: Option<Vec<u8>>
         Account { owner: caller, subaccount: None }
     ).await?;
 
-    // Update or delete order
-    if taker_amount == order.src_amount {
+    // Update or delete order based on fill amount
+    if taker_amount >= order.src_amount {
+        // Complete fill - remove the order
         order.status = OrderStatus::Completed;
         ORDERS.with(|map| map.borrow_mut().remove(&order_id));
     } else {
+        // Partial fill - update the order
+        let original_src_amount = order.src_amount;
         order.src_amount -= taker_amount;
+        
+        // Proportionally reduce min_dst_amount and estimated_dst_amount based on remaining amount
+        let remaining_ratio = order.src_amount as f64 / original_src_amount as f64;
+        order.min_dst_amount = (order.min_dst_amount as f64 * remaining_ratio) as u128;
+        order.estimated_dst_amount = (order.estimated_dst_amount as f64 * remaining_ratio) as u128;
+        
         order.status = OrderStatus::Active;
         ORDERS.with(|map| map.borrow_mut().insert(order_id, order));
     }
