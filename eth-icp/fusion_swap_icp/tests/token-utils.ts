@@ -26,6 +26,19 @@ export interface OrderConfig {
     current_price: number;
   };
   cancellation_auction_secs: number;
+  hashlock: {
+    secret_hash: number[];
+    revealed: boolean;
+    reveal_time: number | null;
+  };
+  timelock: {
+    finality_lock_duration: number;
+    exclusive_withdraw_duration: number;
+    cancellation_timeout: number;
+    created_at: number;
+  };
+  status: string;
+  created_at: number;
 }
 
 export interface CreateOrderResult {
@@ -128,7 +141,20 @@ export class TokenUtils {
         end_price: 900000000,
         current_price: 1000000000
       },
-      cancellation_auction_secs: 3600
+      cancellation_auction_secs: 3600,
+      hashlock: {
+        secret_hash: [],
+        revealed: false,
+        reveal_time: null
+      },
+      timelock: {
+        finality_lock_duration: 0,
+        exclusive_withdraw_duration: 0,
+        cancellation_timeout: 0,
+        created_at: 0
+      },
+      status: 'Open',
+      created_at: 0
     };
 
     return this.createOrderWithDfx(testOrderConfig, identity);
@@ -162,6 +188,68 @@ export class TokenUtils {
     } catch (error) {
       console.error('Error verifying order:', error);
       return false;
+    }
+  }
+
+  /**
+   * Gets a specific order by ID
+   * @param orderId The order ID to get
+   * @returns Promise<OrderConfig | null>
+   */
+  async getOrder(orderId: number): Promise<OrderConfig | null> {
+    try {
+      const result = await execAsync(`dfx canister call ${this.fusionSwapCanisterId} get_order '(${orderId} : nat64)'`);
+      const orderData = result.stdout.trim();
+      
+      if (orderData === '(null)' || orderData === '[]') {
+        return null;
+      }
+      
+      // Parse the order data (this is a simplified parser)
+      // In a real implementation, you'd want to properly parse the Candid output
+      console.log(`Order data: ${orderData}`);
+      
+      // For now, return a basic structure
+      return {
+        id: orderId,
+        src_mint: '',
+        dst_mint: '',
+        maker: '',
+        src_amount: 0,
+        min_dst_amount: 0,
+        estimated_dst_amount: 0,
+        expiration_time: 0,
+        fee: {
+          protocol_fee_bps: 0,
+          integrator_fee_bps: 0,
+          surplus_bps: 0,
+          max_cancel_premium: 0
+        },
+        auction: {
+          start_time: 0,
+          end_time: 0,
+          start_price: 0,
+          end_price: 0,
+          current_price: 0
+        },
+        cancellation_auction_secs: 0,
+        hashlock: {
+          secret_hash: [],
+          revealed: false,
+          reveal_time: null
+        },
+        timelock: {
+          finality_lock_duration: 0,
+          exclusive_withdraw_duration: 0,
+          cancellation_timeout: 0,
+          created_at: 0
+        },
+        status: 'Unknown',
+        created_at: 0
+      };
+    } catch (error) {
+      console.error('Error getting order:', error);
+      return null;
     }
   }
 

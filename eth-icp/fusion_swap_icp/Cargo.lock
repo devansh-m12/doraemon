@@ -183,7 +183,9 @@ dependencies = [
  "ic-cdk-timers",
  "ic-stable-structures 0.7.0",
  "icrc-ledger-types",
+ "scopeguard",
  "serde",
+ "sha2",
 ]
 
 [[package]]
@@ -609,6 +611,12 @@ name = "rustversion"
 version = "1.0.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a0d197bd2c9dc6e53b84da9556a69ba4cdfab8619eb41a8bd1cc2027a0f6b1d"
+
+[[package]]
+name = "scopeguard"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 
 [[package]]
 name = "serde"

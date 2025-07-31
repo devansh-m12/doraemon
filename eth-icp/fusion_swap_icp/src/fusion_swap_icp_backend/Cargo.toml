@@ -16,3 +16,5 @@ serde = { version = "1.0", features = ["derive"] }
 icrc-ledger-types = "0.1.10"
 ic-stable-structures = "0.7.0"
 ic-cdk-timers = "0.7" # Feel free to remove this dependency if you don't need timers
+sha2 = "0.10"
+scopeguard = "1.2"
