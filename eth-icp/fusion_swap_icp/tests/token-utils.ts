@@ -406,9 +406,10 @@ export class TokenUtils {
    * @param orderId The order ID to fill
    * @param amount The amount to fill
    * @param identity The dfx identity to use (e.g., 'test-taker')
+   * @param secret Optional secret for cross-chain withdrawals
    * @returns Promise<FillOrderResult>
    */
-  async fillOrderWithDfx(orderId: number, amount: number, identity: string): Promise<FillOrderResult> {
+  async fillOrderWithDfx(orderId: number, amount: number, identity: string, secret?: string): Promise<FillOrderResult> {
     try {
       // Switch to the specified identity
       console.log(`Switching to identity: ${identity}`);
@@ -424,9 +425,18 @@ export class TokenUtils {
       const approveResult = await execAsync(`dfx canister call ${this.icrc1CanisterId} icrc2_approve '(record { from_subaccount = null; spender = record { owner = principal "${this.fusionSwapCanisterId}"; subaccount = null }; amount = ${amount + 10000000} : nat; expires_at = null })'`);
       console.log(`Approve result: ${approveResult.stdout}`);
 
+      // Prepare the secret parameter
+      let secretParam = 'null : opt vec nat8';
+      if (secret) {
+        const secretBytes = new TextEncoder().encode(secret);
+        const secretArray = Array.from(secretBytes);
+        secretParam = `opt vec { ${secretArray.join('; ')} : nat8 }`;
+        console.log(`Using secret for cross-chain withdrawal: ${secret.substring(0, 10)}...`);
+      }
+
       // Fill the order using dfx
       console.log(`Filling order ${orderId} with amount ${amount}...`);
-      const fillOrderCommand = `dfx canister call ${this.fusionSwapCanisterId} fill_order '(${orderId} : nat64, ${amount} : nat, null : opt vec nat8)'`;
+      const fillOrderCommand = `dfx canister call ${this.fusionSwapCanisterId} fill_order '(${orderId} : nat64, ${amount} : nat, ${secretParam})'`;
 
       const fillResult = await execAsync(fillOrderCommand);
       console.log(`Fill order result: ${fillResult.stdout}`);

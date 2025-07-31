@@ -11,7 +11,12 @@ const ConfigSchema = z.object({
     SRC_CHAIN_RPC: z.string().url(),
     DST_CHAIN_RPC: z.string().url(),
     SRC_CHAIN_CREATE_FORK: bool.default('true'),
-    DST_CHAIN_CREATE_FORK: bool.default('true')
+    DST_CHAIN_CREATE_FORK: bool.default('true'),
+    // ICP Configuration
+    FUSION_SWAP_CANISTER_ID: z.string().default('bkyz2-fmaaa-aaaaa-qaaaq-cai'),
+    ICRC1_CANISTER_ID: z.string().default('br5f7-7uaaa-aaaaa-qaaca-cai'),
+    TEST_MAKER_PRINCIPAL: z.string().default('cjobn-a4566-qzwux-yg5b5-z2vqh-huolu-nhxd6-6xrto-zunsj-zuwdd-qae'),
+    TEST_TAKER_PRINCIPAL: z.string().default('fhrni-ukyxj-tns4p-l7f32-txwvg-anu57-55dcm-gzhue-22yg2-qokvv-mqe')
 })
 
 const fromEnv = ConfigSchema.parse(process.env)
@@ -33,7 +38,7 @@ export const config = {
             }
         },
         destination: {
-            chainId: Sdk.NetworkEnum.BINANCE,
+            chainId: 56 as const, // Using BSC chainId for SDK compatibility
             url: fromEnv.DST_CHAIN_RPC,
             createFork: fromEnv.DST_CHAIN_CREATE_FORK,
             limitOrderProtocol: '0x111111125421ca6dc452d289314280a0f8842a65',
@@ -46,6 +51,12 @@ export const config = {
                 }
             }
         }
+    },
+    icp: {
+        fusionSwapCanisterId: fromEnv.FUSION_SWAP_CANISTER_ID,
+        icrc1CanisterId: fromEnv.ICRC1_CANISTER_ID,
+        testMakerPrincipal: fromEnv.TEST_MAKER_PRINCIPAL,
+        testTakerPrincipal: fromEnv.TEST_TAKER_PRINCIPAL
     }
 } as const
 
