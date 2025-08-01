@@ -12,7 +12,11 @@ import {
   MultiChainTokensResponse,
   SupportedChainsResponse,
   TokenCustomRequest,
-  TokenCustomResponse
+  TokenCustomResponse,
+  SingleTokenRequest,
+  SingleTokenResponse,
+  MultiChainSearchRequest,
+  MultiChainSearchResponse
 } from './TokenTypes';
 
 export class TokenService extends BaseService {
@@ -30,9 +34,10 @@ export class TokenService extends BaseService {
           properties: {
             chainId: { type: 'number', description: 'Chain ID' },
             query: { type: 'string', description: 'Search query' },
-            provider: { type: 'string', description: 'Provider code', default: '1inch' },
-            country: { type: 'string', description: 'Country code' },
-            limit: { type: 'number', description: 'Maximum number of results' }
+            ignore_listed: { type: 'boolean', description: 'Ignore listed tokens' },
+            only_positive_rating: { type: 'boolean', description: 'Only positive rating tokens' },
+            limit: { type: 'number', description: 'Maximum number of results' },
+            country: { type: 'object', description: 'Country object' }
           },
           required: ['chainId', 'query']
         }
@@ -125,9 +130,10 @@ export class TokenService extends BaseService {
           type: 'object',
           properties: {
             query: { type: 'string', description: 'Search query' },
-            provider: { type: 'string', description: 'Provider code', default: '1inch' },
-            country: { type: 'string', description: 'Country code' },
-            limit: { type: 'number', description: 'Maximum number of results' }
+            ignore_listed: { type: 'boolean', description: 'Ignore listed tokens' },
+            only_positive_rating: { type: 'boolean', description: 'Only positive rating tokens' },
+            limit: { type: 'number', description: 'Maximum number of results' },
+            country: { type: 'object', description: 'Country object' }
           },
           required: ['query']
         }
@@ -278,30 +284,36 @@ export class TokenService extends BaseService {
     }
   }
 
-  // Implementation methods - Updated to match v1.3 API
+  // Implementation methods - Updated to match documented v1.3 API endpoints
+  
+  // GET /v1.3/{chainId}/search
   async searchTokens(params: TokenSearchRequest): Promise<TokenSearchResponse> {
     this.validateRequiredParams(params, ['chainId', 'query']);
     
-    const { chainId, query, provider = '1inch', country, limit } = params;
+    const { chainId, query, ignore_listed, only_positive_rating, limit, country } = params;
     
-    const queryParams: any = { query, provider };
-    if (country) queryParams.country = country;
+    const queryParams: any = { query };
+    if (ignore_listed !== undefined) queryParams.ignore_listed = ignore_listed;
+    if (only_positive_rating !== undefined) queryParams.only_positive_rating = only_positive_rating;
     if (limit) queryParams.limit = limit;
+    if (country) queryParams.country = country;
     
     return await this.makeRequest<TokenSearchResponse>(`/token/v1.3/${chainId}/search`, queryParams);
   }
 
+  // GET /v1.2/{chainId}/custom
   async getTokensInfo(params: TokenCustomRequest): Promise<TokenCustomResponse> {
     this.validateRequiredParams(params, ['chainId', 'addresses']);
     
     const { chainId, addresses, provider = '1inch', country } = params;
     
-    const queryParams: any = { provider };
+    const queryParams: any = { addresses, provider };
     if (country) queryParams.country = country;
     
-    return await this.makeRequest<TokenCustomResponse>(`/token/v1.3/${chainId}/custom/${addresses}`, queryParams);
+    return await this.makeRequest<TokenCustomResponse>(`/token/v1.2/${chainId}/custom`, queryParams);
   }
 
+  // GET /v1.3/{chainId}
   async getAllTokensInfo(params: AllTokensInfoRequest): Promise<AllTokensInfoResponse> {
     this.validateRequiredParams(params, ['chainId']);
     
@@ -313,6 +325,7 @@ export class TokenService extends BaseService {
     return await this.makeRequest<AllTokensInfoResponse>(`/token/v1.3/${chainId}`, queryParams);
   }
 
+  // GET /v1.2/{chainId}/token-list
   async getTokenList(params: TokenListRequest): Promise<TokenListResponse> {
     this.validateRequiredParams(params, ['chainId']);
     
@@ -321,10 +334,11 @@ export class TokenService extends BaseService {
     const queryParams: any = { provider };
     if (country) queryParams.country = country;
     
-    return await this.makeRequest<TokenListResponse>(`/token/v1.3/${chainId}/token-list`, queryParams);
+    return await this.makeRequest<TokenListResponse>(`/token/v1.2/${chainId}/token-list`, queryParams);
   }
 
-  async getSingleTokenInfo(params: { chainId: number; address: string; provider?: string; country?: string }): Promise<any> {
+  // GET /v1.2/{chainId}/custom/{address}
+  async getSingleTokenInfo(params: SingleTokenRequest): Promise<SingleTokenResponse> {
     this.validateRequiredParams(params, ['chainId', 'address']);
     
     const { chainId, address, provider = '1inch', country } = params;
@@ -332,9 +346,10 @@ export class TokenService extends BaseService {
     const queryParams: any = { provider };
     if (country) queryParams.country = country;
     
-    return await this.makeRequest<any>(`/token/v1.3/${chainId}/${address}`, queryParams);
+    return await this.makeRequest<SingleTokenResponse>(`/token/v1.2/${chainId}/custom/${address}`, queryParams);
   }
 
+  // GET /v1.3/multi-chain
   async getMultiChainTokens(params: MultiChainTokensRequest): Promise<MultiChainTokensResponse> {
     const { provider = '1inch', country } = params;
     
@@ -344,27 +359,32 @@ export class TokenService extends BaseService {
     return await this.makeRequest<MultiChainTokensResponse>(`/token/v1.3/multi-chain`, queryParams);
   }
 
-  async getMultiChainTokensList(params: MultiChainTokensRequest): Promise<MultiChainTokensResponse> {
+  // GET /v1.3/multi-chain/token-list
+  async getMultiChainTokensList(params: MultiChainTokensRequest): Promise<TokenListResponse> {
     const { provider = '1inch', country } = params;
     
     const queryParams: any = { provider };
     if (country) queryParams.country = country;
     
-    return await this.makeRequest<MultiChainTokensResponse>(`/token/v1.3/multi-chain/token-list`, queryParams);
+    return await this.makeRequest<TokenListResponse>(`/token/v1.3/multi-chain/token-list`, queryParams);
   }
 
-  async searchMultiChainTokens(params: { query: string; provider?: string; country?: string; limit?: number }): Promise<TokenSearchResponse> {
+  // GET /v1.3/search
+  async searchMultiChainTokens(params: MultiChainSearchRequest): Promise<MultiChainSearchResponse> {
     this.validateRequiredParams(params, ['query']);
     
-    const { query, provider = '1inch', country, limit } = params;
+    const { query, ignore_listed, only_positive_rating, limit, country } = params;
     
-    const queryParams: any = { query, provider };
-    if (country) queryParams.country = country;
+    const queryParams: any = { query };
+    if (ignore_listed !== undefined) queryParams.ignore_listed = ignore_listed;
+    if (only_positive_rating !== undefined) queryParams.only_positive_rating = only_positive_rating;
     if (limit) queryParams.limit = limit;
+    if (country) queryParams.country = country;
     
-    return await this.makeRequest<TokenSearchResponse>(`/token/v1.3/multi-chain/search`, queryParams);
+    return await this.makeRequest<MultiChainSearchResponse>(`/token/v1.3/search`, queryParams);
   }
 
+  // GET /v1.3/multi-chain/supported-chains
   async getSupportedChains(): Promise<SupportedChainsResponse> {
     return await this.makeRequest<SupportedChainsResponse>(`/token/v1.3/multi-chain/supported-chains`);
   }
@@ -382,36 +402,36 @@ The 1inch Token API provides comprehensive token information across multiple blo
 Get 1inch whitelisted multi-chain token info.
 **Parameters:** provider (optional), country (optional)
 
-### GET /token/v1.3/multi-chain/list
+### GET /token/v1.3/multi-chain/token-list
 Returns the tokens as a list, not as a map.
 **Parameters:** provider (optional), country (optional)
 
-### GET /token/v1.3/chains
+### GET /token/v1.3/multi-chain/supported-chains
 Lists all supported chain IDs.
 
-### GET /token/v1.3/multi-chain/search
+### GET /token/v1.3/search
 Search for whitelisted multi-chain tokens by name or symbol.
-**Parameters:** query (required), provider (optional), country (optional), limit (optional)
+**Parameters:** query (required), ignore_listed (optional), only_positive_rating (optional), limit (optional), country (optional)
 
-### GET /token/v1.3/{chain_id}
+### GET /token/v1.3/{chainId}
 Gets 1inch whitelisted tokens for a specific chain.
-**Parameters:** chain_id (required), provider (optional), country (optional)
+**Parameters:** chainId (required), provider (optional), country (optional)
 
-### GET /token/v1.3/{chain_id}/list
-Same as above, but returns the tokens as a list.
-**Parameters:** chain_id (required), provider (optional), country (optional)
+### GET /token/v1.2/{chainId}/token-list
+Returns tokens as a list for a specific chain.
+**Parameters:** chainId (required), provider (optional), country (optional)
 
-### GET /token/v1.3/{chain_id}/search
+### GET /token/v1.2/{chainId}/search
 Search whitelisted tokens on a given chain by name or symbol.
-**Parameters:** chain_id (required), query (required), provider (optional), country (optional), limit (optional)
+**Parameters:** chainId (required), query (required), ignore_listed (optional), only_positive_rating (optional), limit (optional), country (optional)
 
-### GET /token/v1.3/{chain_id}/custom/{addresses}
+### GET /token/v1.2/{chainId}/custom
 Get info on multiple specific tokens by addresses on a given chain.
-**Parameters:** chain_id (required), addresses (required), provider (optional), country (optional)
+**Parameters:** chainId (required), addresses (required), provider (optional), country (optional)
 
-### GET /token/v1.3/{chain_id}/{address}
+### GET /token/v1.2/{chainId}/custom/{address}
 Get info for a single token/address on a given chain.
-**Parameters:** chain_id (required), address (required), provider (optional), country (optional)
+**Parameters:** chainId (required), address (required), provider (optional), country (optional)
 
 ## Authentication
 All endpoints require an API key via Authorization: Bearer header.
@@ -430,7 +450,7 @@ All endpoints require an API key via Authorization: Bearer header.
 ## Example Usage
 Search for "USDC" tokens on Ethereum:
 \`\`\`
-GET /token/v1.3/1/search?query=USDC&limit=5&provider=1inch
+GET /token/v1.3/1/search?query=USDC&limit=5
 \`\`\`
     `;
   }

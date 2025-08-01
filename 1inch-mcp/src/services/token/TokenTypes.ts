@@ -1,22 +1,34 @@
 export interface TokenSearchRequest {
   chainId: number;
   query: string;
+  ignore_listed?: boolean;
+  only_positive_rating?: boolean;
   limit?: number;
-  provider?: string;
-  country?: string;
+  country?: object;
 }
 
 export interface TokenSearchResponse {
-  tokens: TokenInfoResponse[];
+  // Array of TokenDto objects
+  [key: number]: TokenDto;
 }
 
-export interface TokenInfoResponse {
-  address: string;
+export interface TokenDto {
+  chainId: number;
   symbol: string;
   name: string;
+  address: string;
   decimals: number;
   logoURI?: string;
-  tags?: string[];
+  rating?: number;
+  eip2612?: boolean;
+  isFoT?: boolean;
+  tags?: TagDto[];
+  providers?: string[];
+}
+
+export interface TagDto {
+  name: string;
+  description?: string;
 }
 
 export interface TokenInfoRequest {
@@ -25,14 +37,18 @@ export interface TokenInfoRequest {
 }
 
 export interface TokenInfoMapResponse {
-  [address: string]: {
-    address: string;
-    symbol: string;
-    name: string;
-    decimals: number;
-    logoURI?: string;
-    tags?: string[];
-  };
+  [address: string]: ProviderTokenDto;
+}
+
+export interface ProviderTokenDto {
+  chainId: number;
+  symbol: string;
+  name: string;
+  address: string;
+  decimals: number;
+  logo?: string;
+  tags?: string[];
+  providers?: string[];
 }
 
 export interface AllTokensInfoRequest {
@@ -42,7 +58,8 @@ export interface AllTokensInfoRequest {
 }
 
 export interface AllTokensInfoResponse {
-  tokens: TokenInfoResponse[];
+  // Map of token address to ProviderTokenDto
+  [address: string]: ProviderTokenDto;
 }
 
 export interface TokenListRequest {
@@ -52,23 +69,47 @@ export interface TokenListRequest {
 }
 
 export interface TokenListResponse {
-  tokens: TokenInfoResponse[];
+  keywords: string[];
+  logoURI: string;
+  name: string;
+  tags: object;
+  tags_order: string[];
+  timestamp: string;
+  tokens: TokenInfoDto[];
+  version: {
+    major: number;
+    minor: number;
+    patch: number;
+  };
 }
 
-// New type definitions for v1.3 API endpoints
+export interface TokenInfoDto {
+  address: string;
+  chainId: number;
+  decimals: number;
+  extensions?: object;
+  logoURI?: string;
+  name: string;
+  symbol: string;
+  tags?: string[];
+}
+
+// Multi-chain endpoints
 export interface MultiChainTokensRequest {
   provider?: string;
   country?: string;
 }
 
 export interface MultiChainTokensResponse {
+  // Map of chainId to map of token address to token info
   [chainId: string]: {
-    [address: string]: TokenInfoResponse;
+    [address: string]: ProviderTokenDto;
   };
 }
 
 export interface SupportedChainsResponse {
-  chains: number[];
+  // Array of chain IDs
+  [key: number]: number;
 }
 
 export interface TokenCustomRequest {
@@ -79,5 +120,38 @@ export interface TokenCustomRequest {
 }
 
 export interface TokenCustomResponse {
-  tokens: TokenInfoResponse[];
+  // Map of address to TokenInfoDto
+  [address: string]: TokenInfoDto;
+}
+
+export interface SingleTokenRequest {
+  chainId: number;
+  address: string;
+  provider?: string;
+  country?: string;
+}
+
+export interface SingleTokenResponse {
+  chainId: number;
+  symbol: string;
+  name: string;
+  address: string;
+  decimals: number;
+  logo?: string;
+  rating?: number;
+  tags?: string[];
+  providers?: string[];
+}
+
+export interface MultiChainSearchRequest {
+  query: string;
+  ignore_listed?: boolean;
+  only_positive_rating?: boolean;
+  limit?: number;
+  country?: object;
+}
+
+export interface MultiChainSearchResponse {
+  // Array of TokenDto objects
+  [key: number]: TokenDto;
 } 

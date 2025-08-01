@@ -48,6 +48,8 @@ describe('TokenService', () => {
       expect(searchTokensTool).toBeDefined();
       expect(searchTokensTool?.inputSchema.properties).toHaveProperty('chainId');
       expect(searchTokensTool?.inputSchema.properties).toHaveProperty('query');
+      expect(searchTokensTool?.inputSchema.properties).toHaveProperty('ignore_listed');
+      expect(searchTokensTool?.inputSchema.properties).toHaveProperty('only_positive_rating');
       expect(searchTokensTool?.inputSchema.required).toContain('chainId');
       expect(searchTokensTool?.inputSchema.required).toContain('query');
     });
@@ -81,12 +83,12 @@ describe('TokenService', () => {
         const result = await tokenService.searchTokens({
           chainId: testChain,
           query: testQuery,
-          limit: 1
+          limit: 5
         });
 
         expect(result).toBeDefined();
         expect(typeof result).toBe('object');
-        // The API returns tokens directly as an array, not wrapped in a tokens property
+        // The API returns tokens as an array
         expect(Array.isArray(result)).toBe(true);
         
         // Log the result for debugging
@@ -96,24 +98,18 @@ describe('TokenService', () => {
 
     describe('getTokensInfo', () => {
       it('should get tokens info by addresses', async () => {
-        // This endpoint seems to have issues with the address format
-        try {
-          const result = await tokenService.getTokensInfo({
-            chainId: testChain,
-            addresses: testAddresses.join(',')
-          });
+        const result = await tokenService.getTokensInfo({
+          chainId: testChain,
+          addresses: testAddresses.join(',')
+        });
 
-          expect(result).toBeDefined();
-          expect(typeof result).toBe('object');
-          // The API returns tokens directly as an array, not wrapped in a tokens property
-          expect(Array.isArray(result)).toBe(true);
-          
-          // Log the result for debugging
-          console.log('Get tokens info result:', JSON.stringify(result, null, 2));
-        } catch (error: any) {
-          // Expected to fail with 400 as this endpoint may have format issues
-          expect(error.message).toContain('Request failed');
-        }
+        expect(result).toBeDefined();
+        expect(typeof result).toBe('object');
+        // The API returns tokens as a map of address to token info
+        expect(typeof result).toBe('object');
+        
+        // Log the result for debugging
+        console.log('Get tokens info result:', JSON.stringify(result, null, 2));
       }, 15000);
     });
 
@@ -125,7 +121,7 @@ describe('TokenService', () => {
 
         expect(result).toBeDefined();
         expect(typeof result).toBe('object');
-        // The API returns tokens as a map, not an array
+        // The API returns tokens as a map
         expect(typeof result).toBe('object');
         
         // Log the result for debugging
@@ -141,8 +137,9 @@ describe('TokenService', () => {
 
         expect(result).toBeDefined();
         expect(typeof result).toBe('object');
-        // The API returns tokens as a map, not an array
-        expect(typeof result).toBe('object');
+        // The API returns TokenListResponse with tokens array
+        expect(result).toHaveProperty('tokens');
+        expect(Array.isArray(result.tokens)).toBe(true);
         
         // Log the result for debugging
         console.log('Get token list result:', JSON.stringify(result, null, 2));
@@ -151,21 +148,19 @@ describe('TokenService', () => {
 
     describe('getSingleTokenInfo', () => {
       it('should get single token info by address', async () => {
-        try {
-          const result = await tokenService.getSingleTokenInfo({
-            chainId: testChain,
-            address: testSingleAddress
-          });
+        const result = await tokenService.getSingleTokenInfo({
+          chainId: testChain,
+          address: testSingleAddress
+        });
 
-          expect(result).toBeDefined();
-          expect(typeof result).toBe('object');
-          
-          // Log the result for debugging
-          console.log('Get single token info result:', JSON.stringify(result, null, 2));
-        } catch (error: any) {
-          // Expected to fail with 404 as this endpoint may be deprecated
-          expect(error.message).toContain('Request failed');
-        }
+        expect(result).toBeDefined();
+        expect(typeof result).toBe('object');
+        expect(result).toHaveProperty('address');
+        expect(result).toHaveProperty('symbol');
+        expect(result).toHaveProperty('name');
+        
+        // Log the result for debugging
+        console.log('Get single token info result:', JSON.stringify(result, null, 2));
       }, 15000);
     });
 
@@ -178,6 +173,7 @@ describe('TokenService', () => {
 
         expect(result).toBeDefined();
         expect(typeof result).toBe('object');
+        // The API returns a map of chainId to token maps
         
         // Log the result for debugging
         console.log('Get multi-chain tokens result:', JSON.stringify(result, null, 2));
@@ -186,42 +182,33 @@ describe('TokenService', () => {
 
     describe('getMultiChainTokensList', () => {
       it('should get multi-chain tokens list', async () => {
-        // This endpoint returns 404, likely deprecated
-        try {
-          const result = await tokenService.getMultiChainTokensList({});
+        const result = await tokenService.getMultiChainTokensList({});
 
-          expect(result).toBeDefined();
-          expect(typeof result).toBe('object');
-          
-          // Log the result for debugging
-          console.log('Get multi-chain tokens list result:', JSON.stringify(result, null, 2));
-        } catch (error: any) {
-          // Expected to fail with 404 as this endpoint may be deprecated
-          expect(error.message).toContain('Request failed');
-        }
+        expect(result).toBeDefined();
+        expect(typeof result).toBe('object');
+        // The API returns TokenListResponse with tokens array
+        expect(result).toHaveProperty('tokens');
+        expect(Array.isArray(result.tokens)).toBe(true);
+        
+        // Log the result for debugging
+        console.log('Get multi-chain tokens list result:', JSON.stringify(result, null, 2));
       }, 15000);
     });
 
     describe('searchMultiChainTokens', () => {
       it('should search multi-chain tokens', async () => {
-        // This endpoint returns 404, likely deprecated
-        try {
-          const result = await tokenService.searchMultiChainTokens({
-            query: testQuery,
-            limit: 5
-          });
+        const result = await tokenService.searchMultiChainTokens({
+          query: testQuery,
+          limit: 5
+        });
 
-          expect(result).toBeDefined();
-          expect(typeof result).toBe('object');
-          // The API returns tokens directly as an array, not wrapped in a tokens property
-          expect(Array.isArray(result)).toBe(true);
-          
-          // Log the result for debugging
-          console.log('Search multi-chain tokens result:', JSON.stringify(result, null, 2));
-        } catch (error: any) {
-          // Expected to fail with 404 as this endpoint may be deprecated
-          expect(error.message).toContain('Request failed');
-        }
+        expect(result).toBeDefined();
+        expect(typeof result).toBe('object');
+        // The API returns tokens as an array
+        expect(Array.isArray(result)).toBe(true);
+        
+        // Log the result for debugging
+        console.log('Search multi-chain tokens result:', JSON.stringify(result, null, 2));
       }, 15000);
     });
 
@@ -231,7 +218,7 @@ describe('TokenService', () => {
 
         expect(result).toBeDefined();
         expect(typeof result).toBe('object');
-        // The API returns chains directly as an array, not wrapped in a chains property
+        // The API returns chains as an array
         expect(Array.isArray(result)).toBe(true);
         
         // Log the result for debugging
@@ -250,26 +237,20 @@ describe('TokenService', () => {
 
       expect(result).toBeDefined();
       expect(typeof result).toBe('object');
-      // The API returns tokens directly as an array, not wrapped in a tokens property
+      // The API returns tokens as an array
       expect(Array.isArray(result)).toBe(true);
     }, 15000);
 
     it('should handle get_tokens_info tool call', async () => {
-      // This endpoint seems to have issues with the address format
-      try {
-        const result = await tokenService.handleToolCall('get_tokens_info', {
-          chainId: testChain,
-          addresses: testAddresses.join(',')
-        });
+      const result = await tokenService.handleToolCall('get_tokens_info', {
+        chainId: testChain,
+        addresses: testAddresses.join(',')
+      });
 
-        expect(result).toBeDefined();
-        expect(typeof result).toBe('object');
-        // The API returns tokens directly as an array, not wrapped in a tokens property
-        expect(Array.isArray(result)).toBe(true);
-      } catch (error: any) {
-        // Expected to fail with 400 as this endpoint may have format issues
-        expect(error.message).toContain('Request failed');
-      }
+      expect(result).toBeDefined();
+      expect(typeof result).toBe('object');
+      // The API returns tokens as a map
+      expect(typeof result).toBe('object');
     }, 15000);
 
     it('should handle get_all_tokens_info tool call', async () => {
@@ -279,7 +260,7 @@ describe('TokenService', () => {
 
       expect(result).toBeDefined();
       expect(typeof result).toBe('object');
-      // The API returns tokens as a map, not an array
+      // The API returns tokens as a map
       expect(typeof result).toBe('object');
     }, 15000);
 
@@ -290,24 +271,21 @@ describe('TokenService', () => {
 
       expect(result).toBeDefined();
       expect(typeof result).toBe('object');
-      // The API returns tokens as a map, not an array
-      expect(typeof result).toBe('object');
+      // The API returns TokenListResponse
+      expect(result).toHaveProperty('tokens');
+      expect(Array.isArray(result.tokens)).toBe(true);
     }, 15000);
 
     it('should handle get_single_token_info tool call', async () => {
-      // This endpoint returns 404, likely deprecated
-      try {
-        const result = await tokenService.handleToolCall('get_single_token_info', {
-          chainId: testChain,
-          address: testSingleAddress
-        });
+      const result = await tokenService.handleToolCall('get_single_token_info', {
+        chainId: testChain,
+        address: testSingleAddress
+      });
 
-        expect(result).toBeDefined();
-        expect(typeof result).toBe('object');
-      } catch (error: any) {
-        // Expected to fail with 404 as this endpoint may be deprecated
-        expect(error.message).toContain('Request failed');
-      }
+      expect(result).toBeDefined();
+      expect(typeof result).toBe('object');
+      expect(result).toHaveProperty('address');
+      expect(result).toHaveProperty('symbol');
     }, 15000);
 
     it('should handle get_multi_chain_tokens tool call', async () => {
@@ -318,34 +296,24 @@ describe('TokenService', () => {
     }, 15000);
 
     it('should handle get_multi_chain_tokens_list tool call', async () => {
-      // This endpoint returns 404, likely deprecated
-      try {
-        const result = await tokenService.handleToolCall('get_multi_chain_tokens_list', {});
+      const result = await tokenService.handleToolCall('get_multi_chain_tokens_list', {});
 
-        expect(result).toBeDefined();
-        expect(typeof result).toBe('object');
-      } catch (error: any) {
-        // Expected to fail with 404 as this endpoint may be deprecated
-        expect(error.message).toContain('Request failed');
-      }
+      expect(result).toBeDefined();
+      expect(typeof result).toBe('object');
+      expect(result).toHaveProperty('tokens');
+      expect(Array.isArray(result.tokens)).toBe(true);
     }, 15000);
 
     it('should handle search_multi_chain_tokens tool call', async () => {
-      // This endpoint returns 404, likely deprecated
-      try {
-        const result = await tokenService.handleToolCall('search_multi_chain_tokens', {
-          query: testQuery,
-          limit: 5
-        });
+      const result = await tokenService.handleToolCall('search_multi_chain_tokens', {
+        query: testQuery,
+        limit: 5
+      });
 
-        expect(result).toBeDefined();
-        expect(typeof result).toBe('object');
-        // The API returns tokens directly as an array, not wrapped in a tokens property
-        expect(Array.isArray(result)).toBe(true);
-      } catch (error: any) {
-        // Expected to fail with 404 as this endpoint may be deprecated
-        expect(error.message).toContain('Request failed');
-      }
+      expect(result).toBeDefined();
+      expect(typeof result).toBe('object');
+      // The API returns tokens as an array
+      expect(Array.isArray(result)).toBe(true);
     }, 15000);
 
     it('should handle get_supported_chains tool call', async () => {
@@ -353,7 +321,7 @@ describe('TokenService', () => {
 
       expect(result).toBeDefined();
       expect(typeof result).toBe('object');
-      // The API returns chains directly as an array, not wrapped in a chains property
+      // The API returns chains as an array
       expect(Array.isArray(result)).toBe(true);
     }, 15000);
 
