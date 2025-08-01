@@ -160,7 +160,7 @@ npm install -g pnpm
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/devansh-m12/doraemon.git
 cd eth-icp
 
 # Install dependencies
@@ -265,89 +265,162 @@ REENTRANCY_GUARD.with(|guard| {
 
 ## 🧪 Testing
 
+The project includes comprehensive testing across multiple scenarios, focusing on **hybrid cross-chain operations** since 1inch doesn't currently support ICP natively.
+
+### Test Structure
+
+#### 1. **Cross-Chain Hybrid Tests** (`eth-icp/tests/`)
+These tests simulate cross-chain operations between Ethereum and ICP using a hybrid approach:
+
+- **ETH-to-ICP Hybrid Tests** (`eth-to-icp-hybrid.spec.ts`): 
+  - Creates orders on Ethereum using 1inch SDK
+  - Simulates corresponding ICP operations using real ICP contracts
+  - Tests token transfers from ETH to ICP with hashlock verification
+  - Validates cross-chain secret sharing and withdrawal mechanisms
+
+- **ICP-to-ETH Hybrid Tests** (`icp-to-eth-hybrid.spec.ts`):
+  - Creates orders on ICP using Fusion+ protocol
+  - Simulates corresponding Ethereum operations using 1inch SDK
+  - Tests token transfers from ICP to ETH with atomic swap validation
+  - Tests cancellation scenarios and timelock mechanisms
+
+- **Supporting Infrastructure**:
+  - `escrow-factory.ts`: Manages escrow contract deployment and events
+  - `resolver.ts`: Handles cross-chain resolver operations
+  - `wallet.ts`: Provides wallet utilities for both chains
+  - `icp-destination-resolver.ts`: Bridges ICP operations with test framework
+
+#### 2. **ICP Fusion+ Protocol Tests** (`eth-icp/fusion_swap_icp/tests/`)
+These tests validate the core ICP Fusion+ protocol implementation:
+
+- **Fusion+ Protocol Tests** (`fusion-plus.test.ts`):
+  - Tests hashlock system with secret generation and verification
+  - Validates Dutch auction pricing mechanisms
+  - Tests timelock functionality and cancellation scenarios
+  - Verifies order creation, filling, and withdrawal flows
+
+- **ICRC Token Tests** (`icrc-utils.test.ts`, `icrc1-token-transfer.test.ts`):
+  - Tests ICRC-1 and ICRC-2 token operations
+  - Validates balance checking, transfers, and approvals
+  - Tests batch operations and transaction history
+
+- **Order Management Tests** (`dfx-order-creation.test.ts`, `fill-order.test.ts`):
+  - Tests order creation using DFX commands
+  - Validates order filling with secret verification
+  - Tests order cancellation and recovery mechanisms
+
+### What's Actually Being Tested
+
+#### Cross-Chain Simulation
+Since 1inch doesn't natively support ICP, the tests simulate cross-chain operations:
+
+1. **ETH → ICP Flow**:
+   - Create order on Ethereum using 1inch SDK
+   - Generate cross-chain secret and hashlock
+   - Create corresponding ICP order with same secret
+   - Verify withdrawal using shared secret on both chains
+
+2. **ICP → ETH Flow**:
+   - Create order on ICP using Fusion+ protocol
+   - Generate cross-chain secret and hashlock
+   - Create corresponding Ethereum order with same secret
+   - Verify withdrawal using shared secret on both chains
+
+#### Real ICP Operations
+The tests use actual ICP canisters and DFX commands:
+
+- **Real Token Transfers**: Using ICRC-1 ledger canister
+- **Real Order Creation**: Using Fusion+ backend canister
+- **Real Balance Checks**: Querying actual ICP token balances
+- **Real Secret Verification**: Using actual hashlock validation
+
 ### Running Tests
 
 ```bash
-# Run all tests
+# Run all cross-chain hybrid tests
+cd eth-icp
 pnpm test
 
 # Run specific test suites
-pnpm test -- --testNamePattern="Order Creation"
-pnpm test -- --testNamePattern="Dutch Auction"
-pnpm test -- --testNamePattern="Cross-chain"
+pnpm test -- --testNamePattern="ETH to ICP"
+pnpm test -- --testNamePattern="ICP to ETH"
 
-# Run with specific networks
+# Run ICP Fusion+ protocol tests
+cd fusion_swap_icp
+pnpm test
+
+# Run specific ICP test suites
+pnpm test -- --testNamePattern="Fusion+"
+pnpm test -- --testNamePattern="ICRC"
+pnpm test -- --testNamePattern="Order"
+
+# Run with specific network configuration
 SRC_CHAIN_RPC=ETH_FORK_URL DST_CHAIN_RPC=BNB_FORK_URL pnpm test
+```
+
+### Test Examples
+
+#### Cross-Chain Hybrid Transfer Test
+```typescript
+describe('ETH to ICP Hybrid Cross-Chain Transfer', () => {
+  it('should transfer ETH USDC tokens to ICP tokens via hybrid cross-chain swap', async () => {
+    // Step 1: Create cross-chain order on Ethereum (using SDK)
+    const secret = uint8ArrayToHex(randomBytes(32))
+    const order = Sdk.CrossChainOrder.new(/* order config */)
+    
+    // Step 2: Resolver fills order on Ethereum
+    const {txHash: orderFillHash, blockHash: srcDeployBlock} = await srcChainResolver.send(
+      resolverContract.deploySrc(/* order params */)
+    )
+    
+    // Step 3: Create corresponding ICP order using real fusion implementation
+    const icpOrderConfig = icpResolver.createTestOrderConfig(icpOrderId, icpSrcAmount, icpDstAmount, secret)
+    const createResult = await icpResolver.createOrder(icpOrderConfig, 'test-maker')
+    
+    // Step 4: Withdraw from both chains using shared secret
+    const withdrawalSuccess = await icpResolver.withdrawFromOrder(icpOrderId, secret, 'test-taker')
+    const {txHash: resolverWithdrawHash} = await srcChainResolver.send(
+      resolverContract.withdraw('src', srcEscrowAddress, secret, srcEscrowEvent[0])
+    )
+  })
+})
+```
+
+#### ICP Fusion+ Protocol Test
+```typescript
+describe('Fusion+ Protocol Tests', () => {
+  it('should create order with hashlock', async () => {
+    const { secret, secretHash } = generateSecretAndHash()
+    const order = createFusionOrder(100, 'test-maker', 1000000000, 900000000, secret)
+    
+    const result = await tokenUtils.createOrderWithDfx(order, 'test-maker')
+    expect(result.success).toBe(true)
+    
+    // Verify hashlock was properly set
+    const createdOrder = await tokenUtils.getOrder(order.id)
+    expect(createdOrder?.hashlock.secret_hash).toEqual(secretHash.slice(0, 32))
+  })
+})
 ```
 
 ### Test Coverage
 
 ```bash
-# Generate coverage report
+# Generate coverage report for cross-chain tests
+cd eth-icp
+pnpm test:coverage
+
+# Generate coverage report for ICP contract tests
+cd fusion_swap_icp
 pnpm test:coverage
 
 # View coverage in browser
 open coverage/lcov-report/index.html
 ```
 
-## 📈 Performance & Scalability
 
-### Current Metrics
-- **Order Creation**: ~2-3 seconds
-- **Order Filling**: ~1-2 seconds
-- **Cross-chain Bridge**: ~30-60 seconds
-- **Gas Efficiency**: Optimized for ICP cycles
 
-### Scalability Features
-- **Batch Operations**: Multiple orders in single transaction
-- **Partial Fills**: Incremental order fulfillment
-- **Resolver Network**: Distributed execution
-- **Stable Memory**: Persistent storage across upgrades
 
-## 🔮 Future Roadmap
-
-### Phase 1: Core Protocol (✅ Complete)
-- [x] Basic escrow functionality
-- [x] Dutch auction mechanism
-- [x] Hashlock/timelock system
-- [x] ICRC-2 integration
-
-### Phase 2: Cross-chain Bridge (🔄 In Progress)
-- [ ] EVM contract deployment
-- [ ] Bridge protocol implementation
-- [ ] Cross-chain message passing
-- [ ] Atomic swap coordination
-
-### Phase 3: Advanced Features (📋 Planned)
-- [ ] SNS DAO governance
-- [ ] Price oracle integration
-- [ ] Advanced auction types
-- [ ] Multi-chain support
-
-### Phase 4: Production Ready (📋 Planned)
-- [ ] Stable memory migration
-- [ ] Advanced security features
-- [ ] Monitoring and analytics
-- [ ] Production deployment
-
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
-
-### Development Workflow
-
-1. **Fork** the repository
-2. **Create** a feature branch
-3. **Implement** your changes
-4. **Test** thoroughly
-5. **Submit** a pull request
-
-### Code Standards
-
-- Follow Rust coding conventions
-- Include comprehensive tests
-- Update documentation
-- Ensure security best practices
 
 ## 📚 Documentation
 
@@ -366,7 +439,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Internet Computer Foundation** for the ICP platform
 - **OpenZeppelin** for security best practices
 - **Foundry** for smart contract development tools
-
----
-
-**Built with ❤️ for the decentralized future**
