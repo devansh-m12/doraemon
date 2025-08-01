@@ -5,7 +5,7 @@ import { spawn } from 'child_process';
 import cors from 'cors';
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 6969;
 
 // Middleware
 app.use(cors());
@@ -46,26 +46,40 @@ mcpProcess.on('error', (error) => {
   console.error('Failed to start MCP server:', error);
 });
 
-// HTTP endpoint to forward requests to MCP server
+// Generic MCP endpoint that handles all MCP requests
 app.post('/mcp', async (req, res) => {
   try {
     const request = req.body;
     
-    console.log('HTTP Request:', JSON.stringify(request, null, 2));
+    console.log('MCP Request:', JSON.stringify(request, null, 2));
     
     // Send request to MCP server
     mcpProcess.stdin.write(JSON.stringify(request) + '\n');
     
-    // Wait for response (simple implementation)
-    setTimeout(() => {
-      res.json({
-        message: 'Request sent to MCP server',
-        request: request
+    // Wait for response with timeout
+    const timeout = setTimeout(() => {
+      res.status(408).json({ 
+        error: 'Request timeout',
+        message: 'MCP server did not respond within timeout period'
       });
-    }, 1000);
+    }, 10000); // 10 second timeout
+    
+    // Listen for response from MCP server
+    const responseHandler = (data) => {
+      try {
+        const response = JSON.parse(data.toString().trim());
+        clearTimeout(timeout);
+        res.json(response);
+      } catch (error) {
+        // Incomplete response, continue waiting
+      }
+    };
+    
+    // Set up one-time response handler
+    mcpProcess.stdout.once('data', responseHandler);
     
   } catch (error) {
-    console.error('Error handling request:', error);
+    console.error('Error handling MCP request:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -75,9 +89,74 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'healthy',
     service: '1inch-mcp-http-wrapper',
+    port: PORT,
     timestamp: new Date().toISOString()
   });
 });
+
+// List available tools endpoint
+app.get('/tools', async (req, res) => {
+  try {
+    const listToolsRequest = {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/list'
+    };
+    
+    mcpProcess.stdin.write(JSON.stringify(listToolsRequest) + '\n');
+    
+    const timeout = setTimeout(() => {
+      res.status(408).json({ error: 'Timeout getting tools list' });
+    }, 5000);
+    
+    mcpProcess.stdout.once('data', (data) => {
+      try {
+        const response = JSON.parse(data.toString().trim());
+        clearTimeout(timeout);
+        res.json(response);
+      } catch (error) {
+        res.status(500).json({ error: 'Invalid response format' });
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error getting tools:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// List available resources endpoint
+app.get('/resources', async (req, res) => {
+  try {
+    const listResourcesRequest = {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'resources/list'
+    };
+    
+    mcpProcess.stdin.write(JSON.stringify(listResourcesRequest) + '\n');
+    
+    const timeout = setTimeout(() => {
+      res.status(408).json({ error: 'Timeout getting resources list' });
+    }, 5000);
+    
+    mcpProcess.stdout.once('data', (data) => {
+      try {
+        const response = JSON.parse(data.toString().trim());
+        clearTimeout(timeout);
+        res.json(response);
+      } catch (error) {
+        res.status(500).json({ error: 'Invalid response format' });
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error getting resources:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
 
 // Start HTTP server
 app.listen(PORT, () => {
