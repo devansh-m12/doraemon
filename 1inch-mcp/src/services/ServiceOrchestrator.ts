@@ -17,6 +17,7 @@ import { ChartsService } from './charts/ChartsService';
 import { DomainService } from './domain/DomainService';
 import { logger } from '../config/logger';
 import { IntentSwapService } from './intent-swap/IntentSwapService';
+import { FusionPlusSwapService } from './fusion-plus-swap/FusionPlusSwapService';
 
 export class ServiceOrchestrator {
   private services: Map<string, BaseService>;
@@ -50,6 +51,7 @@ export class ServiceOrchestrator {
     this.services.set('charts', new ChartsService(serviceConfig));
     this.services.set('domain', new DomainService(serviceConfig));
     this.services.set('intent-swap', new IntentSwapService(serviceConfig));
+    this.services.set('fusion-plus-swap', new FusionPlusSwapService(serviceConfig));
     logger.info(`Initialized ${this.services.size} services`);
   }
 
