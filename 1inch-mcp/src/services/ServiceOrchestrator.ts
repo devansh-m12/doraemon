@@ -10,6 +10,7 @@ import { TracesService } from './traces/TracesService';
 import { HistoryService } from './history/HistoryService';
 import { OrderbookService } from './orderbook/OrderbookService';
 import { SpotPriceService } from './spot-price/SpotPriceService';
+import { NFTService } from './nft/NFTService';
 import { logger } from '../config/logger';
 
 export class ServiceOrchestrator {
@@ -38,6 +39,7 @@ export class ServiceOrchestrator {
     this.services.set('history', new HistoryService(serviceConfig));
     this.services.set('orderbook', new OrderbookService(serviceConfig));
     this.services.set('spot-price', new SpotPriceService(serviceConfig));
+    this.services.set('nft', new NFTService(serviceConfig));
 
     logger.info(`Initialized ${this.services.size} services`);
   }
