@@ -68,7 +68,7 @@ app.post('/mcp', async (req, res) => {
       const timeout = setTimeout(() => {
         pendingResponses.delete(request.id);
         reject(new Error('Request timeout'));
-      }, 10000); // 10 second timeout
+      }, 100000); // 10 second timeout
       
       pendingResponses.set(request.id, { resolve, timeout });
     });

@@ -1,7 +1,13 @@
 import { BaseService, ServiceConfig, ToolDefinition, ResourceDefinition, PromptDefinition } from '../base/BaseService';
 import { 
   TokenSearchRequest,
-  TokenSearchResponse
+  TokenSearchResponse,
+  TokenInfoRequest,
+  TokenInfoMapResponse,
+  AllTokensInfoRequest,
+  AllTokensInfoResponse,
+  TokenListRequest,
+  TokenListResponse
 } from './TokenTypes';
 
 export class TokenService extends BaseService {
@@ -19,9 +25,50 @@ export class TokenService extends BaseService {
           properties: {
             chainId: { type: 'number', description: 'Chain ID' },
             query: { type: 'string', description: 'Search query' },
-            limit: { type: 'number', description: 'Maximum number of results', default: 10 }
+            limit: { type: 'number', description: 'Maximum number of results', default: 10 },
+            ignoreListed: { type: 'string', description: 'Ignore listed tokens', default: 'false' }
           },
           required: ['chainId', 'query']
+        }
+      },
+      {
+        name: 'get_tokens_info',
+        description: 'Get detailed information about specific tokens',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            chainId: { type: 'number', description: 'Chain ID' },
+            addresses: { 
+              type: 'array', 
+              items: { type: 'string' },
+              description: 'Array of token addresses'
+            }
+          },
+          required: ['chainId', 'addresses']
+        }
+      },
+      {
+        name: 'get_all_tokens_info',
+        description: 'Get information about all tokens supported by 1inch on a specific network',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            chainId: { type: 'number', description: 'Chain ID' },
+            provider: { type: 'string', description: 'Token provider', default: '1inch' }
+          },
+          required: ['chainId']
+        }
+      },
+      {
+        name: 'get_1inch_token_list',
+        description: 'Get the list of 1inch tokens',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            chainId: { type: 'number', description: 'Chain ID' },
+            provider: { type: 'string', description: 'Token provider', default: '1inch' }
+          },
+          required: ['chainId']
         }
       },
       {
@@ -78,6 +125,12 @@ export class TokenService extends BaseService {
     switch (name) {
       case 'search_tokens':
         return await this.searchTokens(args);
+      case 'get_tokens_info':
+        return await this.getTokensInfo(args);
+      case 'get_all_tokens_info':
+        return await this.getAllTokensInfo(args);
+      case 'get_1inch_token_list':
+        return await this.get1inchTokenList(args);
       case 'supported_chains':
         return await this.getSupportedChains();
       default:
@@ -160,17 +213,44 @@ export class TokenService extends BaseService {
   async searchTokens(params: TokenSearchRequest): Promise<TokenSearchResponse> {
     this.validateRequiredParams(params, ['chainId', 'query']);
     
-    const { chainId, query, limit = 10 } = params;
+    const { chainId, query, limit = 10, ignoreListed = 'false' } = params;
     
-    return await this.makeRequest<TokenSearchResponse>(`/token/v1.3/search`, {
+    return await this.makeRequest<TokenSearchResponse>(`/token/v1.2/${chainId}/search`, {
       query,
       limit,
-      only_positive_rating: true
+      ignore_listed: ignoreListed
+    });
+  }
+
+  async getTokensInfo(params: TokenInfoRequest): Promise<TokenInfoMapResponse> {
+    this.validateRequiredParams(params, ['chainId', 'addresses']);
+    
+    const { chainId, addresses } = params;
+    
+    return await this.makeRequest<TokenInfoMapResponse>(`/token/v1.2/${chainId}/custom/${addresses}`);
+  }
+
+  async getAllTokensInfo(params: AllTokensInfoRequest): Promise<AllTokensInfoResponse> {
+    this.validateRequiredParams(params, ['chainId']);
+    
+    const { chainId, provider = '1inch' } = params;
+    
+    return await this.makeRequest<AllTokensInfoResponse>(`/token/v1.2/${chainId}`, {
+      provider
+    });
+  }
+
+  async get1inchTokenList(params: TokenListRequest): Promise<TokenListResponse> {
+    this.validateRequiredParams(params, ['chainId']);
+    
+    const { chainId, provider = '1inch' } = params;
+    
+    return await this.makeRequest<TokenListResponse>(`/token/v1.2/${chainId}/token-list`, {
+      provider
     });
   }
 
   async getSupportedChains(): Promise<number[]> {
-    console.log('getSupportedChains+==dsd-sdksdj__________________________');
     return await this.makeRequest<number[]>(`/token/v1.3/multi-chain/supported-chains`);
   }
 
