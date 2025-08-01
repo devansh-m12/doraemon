@@ -18,6 +18,8 @@ const mcpProcess = spawn('npx', ['tsx', 'src/index.ts'], {
 
 // Handle MCP server responses
 let responseBuffer = '';
+let pendingResponses = new Map();
+
 mcpProcess.stdout.on('data', (data) => {
   responseBuffer += data.toString();
   
@@ -30,6 +32,14 @@ mcpProcess.stdout.on('data', (data) => {
       if (line.trim()) {
         const response = JSON.parse(line);
         console.log('MCP Response:', JSON.stringify(response, null, 2));
+        
+        // Check if this response matches a pending request
+        if (response.id && pendingResponses.has(response.id)) {
+          const { resolve, timeout } = pendingResponses.get(response.id);
+          clearTimeout(timeout);
+          pendingResponses.delete(response.id);
+          resolve(response);
+        }
       }
     }
   } catch (error) {
@@ -53,30 +63,22 @@ app.post('/mcp', async (req, res) => {
     
     console.log('MCP Request:', JSON.stringify(request, null, 2));
     
+    // Create a promise to wait for the response
+    const responsePromise = new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        pendingResponses.delete(request.id);
+        reject(new Error('Request timeout'));
+      }, 10000); // 10 second timeout
+      
+      pendingResponses.set(request.id, { resolve, timeout });
+    });
+    
     // Send request to MCP server
     mcpProcess.stdin.write(JSON.stringify(request) + '\n');
     
-    // Wait for response with timeout
-    const timeout = setTimeout(() => {
-      res.status(408).json({ 
-        error: 'Request timeout',
-        message: 'MCP server did not respond within timeout period'
-      });
-    }, 10000); // 10 second timeout
-    
-    // Listen for response from MCP server
-    const responseHandler = (data) => {
-      try {
-        const response = JSON.parse(data.toString().trim());
-        clearTimeout(timeout);
-        res.json(response);
-      } catch (error) {
-        // Incomplete response, continue waiting
-      }
-    };
-    
-    // Set up one-time response handler
-    mcpProcess.stdout.once('data', responseHandler);
+    // Wait for response
+    const response = await responsePromise;
+    res.json(response);
     
   } catch (error) {
     console.error('Error handling MCP request:', error);

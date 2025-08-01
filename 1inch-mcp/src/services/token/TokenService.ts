@@ -1,13 +1,7 @@
 import { BaseService, ServiceConfig, ToolDefinition, ResourceDefinition, PromptDefinition } from '../base/BaseService';
 import { 
-  TokenInfoRequest,
-  TokenInfoResponse,
   TokenSearchRequest,
-  TokenSearchResponse,
-  TokenPriceRequest,
-  TokenPriceResponse,
-  TokenBalanceRequest,
-  TokenBalanceResponse
+  TokenSearchResponse
 } from './TokenTypes';
 
 export class TokenService extends BaseService {
@@ -17,18 +11,6 @@ export class TokenService extends BaseService {
 
   getTools(): ToolDefinition[] {
     return [
-      {
-        name: 'get_token_info',
-        description: 'Get detailed information about a token',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            chainId: { type: 'number', description: 'Chain ID' },
-            tokenAddress: { type: 'string', description: 'Token address' }
-          },
-          required: ['chainId', 'tokenAddress']
-        }
-      },
       {
         name: 'search_tokens',
         description: 'Search tokens by name or symbol',
@@ -43,29 +25,12 @@ export class TokenService extends BaseService {
         }
       },
       {
-        name: 'get_token_price',
-        description: 'Get current token price',
+        name: 'supported_chains',
+        description: 'Get all supported chain IDs from 1inch API',
         inputSchema: {
           type: 'object',
-          properties: {
-            chainId: { type: 'number', description: 'Chain ID' },
-            tokenAddress: { type: 'string', description: 'Token address' },
-            currency: { type: 'string', description: 'Currency (default: USD)', default: 'USD' }
-          },
-          required: ['chainId', 'tokenAddress']
-        }
-      },
-      {
-        name: 'get_token_balances',
-        description: 'Get token balances for a wallet address',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            chainId: { type: 'number', description: 'Chain ID' },
-            address: { type: 'string', description: 'Wallet address' },
-            tokens: { type: 'array', description: 'Specific token addresses to check (optional)' }
-          },
-          required: ['chainId', 'address']
+          properties: {},
+          required: []
         }
       }
     ];
@@ -111,14 +76,10 @@ export class TokenService extends BaseService {
 
   async handleToolCall(name: string, args: any): Promise<any> {
     switch (name) {
-      case 'get_token_info':
-        return await this.getTokenInfo(args);
       case 'search_tokens':
         return await this.searchTokens(args);
-      case 'get_token_price':
-        return await this.getTokenPrice(args);
-      case 'get_token_balances':
-        return await this.getTokenBalances(args);
+      case 'supported_chains':
+        return await this.getSupportedChains();
       default:
         throw new Error(`Unknown tool: ${name}`);
     }
@@ -196,16 +157,6 @@ export class TokenService extends BaseService {
   }
 
   // Implementation methods
-  async getTokenInfo(params: TokenInfoRequest): Promise<TokenInfoResponse> {
-    this.validateRequiredParams(params, ['chainId', 'tokenAddress']);
-    
-    const { chainId, tokenAddress } = params;
-    
-    return await this.makeRequest<TokenInfoResponse>(`/token/v1.3/${chainId}/info`, {
-      tokenAddress
-    });
-  }
-
   async searchTokens(params: TokenSearchRequest): Promise<TokenSearchResponse> {
     this.validateRequiredParams(params, ['chainId', 'query']);
     
@@ -218,26 +169,9 @@ export class TokenService extends BaseService {
     });
   }
 
-  async getTokenPrice(params: TokenPriceRequest): Promise<TokenPriceResponse> {
-    this.validateRequiredParams(params, ['chainId', 'tokenAddress']);
-    
-    const { chainId, tokenAddress, currency = 'USD' } = params;
-    
-    return await this.makeRequest<TokenPriceResponse>(`/price/v1.3/${chainId}/price`, {
-      tokenAddress,
-      currency
-    });
-  }
-
-  async getTokenBalances(params: TokenBalanceRequest): Promise<TokenBalanceResponse> {
-    this.validateRequiredParams(params, ['chainId', 'address']);
-    
-    const { chainId, address, tokens } = params;
-    
-    return await this.makeRequest<TokenBalanceResponse>(`/balance/v1.3/${chainId}/balances`, {
-      address,
-      tokens
-    });
+  async getSupportedChains(): Promise<number[]> {
+    console.log('getSupportedChains+==dsd-sdksdj__________________________');
+    return await this.makeRequest<number[]>(`/token/v1.3/multi-chain/supported-chains`);
   }
 
   private async getTokenDocumentation(): Promise<string> {
@@ -245,24 +179,9 @@ export class TokenService extends BaseService {
 # 1inch Token API Documentation
 
 ## Overview
-The 1inch Token API provides access to token information, search functionality, and balance checking across multiple blockchain networks.
+The 1inch Token API provides search functionality for tokens across multiple blockchain networks.
 
 ## Available Endpoints
-
-### GET /token/v1.0/{chainId}/info
-Get detailed information about a specific token.
-
-**Parameters:**
-- chainId: Chain ID
-- tokenAddress: Token address
-
-**Response:**
-- address: Token address
-- symbol: Token symbol
-- name: Token name
-- decimals: Token decimals
-- logoURI: Token logo URL (optional)
-- tags: Token tags (optional)
 
 ### GET /token/v1.0/{chainId}/search
 Search tokens by name or symbol.
@@ -272,29 +191,8 @@ Search tokens by name or symbol.
 - query: Search query
 - limit: Maximum number of results (default: 10)
 
-### GET /price/v1.0/{chainId}/price
-Get current token price.
-
-**Parameters:**
-- chainId: Chain ID
-- tokenAddress: Token address
-- currency: Currency (default: USD)
-
 **Response:**
-- price: Token price
-- currency: Currency
-- timestamp: Price timestamp
-
-### GET /balance/v1.0/{chainId}/balances
-Get token balances for a wallet address.
-
-**Parameters:**
-- chainId: Chain ID
-- address: Wallet address
-- tokens: Specific token addresses to check (optional)
-
-**Response:**
-- tokens: Array of token balances with address, symbol, name, decimals, balance, value, and price
+- tokens: Array of token information including address, symbol, name, decimals, logoURI, and tags
 
 ## Supported Chains
 - Ethereum (1)
@@ -306,12 +204,11 @@ Get token balances for a wallet address.
 - Fantom (250)
 - Gnosis (100)
 
-## Popular Tokens
-- ETH (Ethereum)
-- USDC (USD Coin)
-- USDT (Tether USD)
-- DAI (Dai Stablecoin)
-- WETH (Wrapped Ethereum)
+## Example Usage
+Search for "USDC" tokens on Ethereum:
+\`\`\`
+GET /token/v1.0/1/search?query=USDC&limit=5
+\`\`\`
     `;
   }
 } 

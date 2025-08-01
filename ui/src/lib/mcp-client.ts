@@ -89,12 +89,15 @@ export class MCPClient {
         }
       };
 
+      console.log('MCP Request:', JSON.stringify(mcpRequest, null, 2));
+
       const response = await fetch(`${this.serverUrl}/mcp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(mcpRequest)
+        body: JSON.stringify(mcpRequest),
+        signal: AbortSignal.timeout(60000) // 60 second timeout
       });
 
       if (!response.ok) {
@@ -102,12 +105,16 @@ export class MCPClient {
       }
 
       const result = await response.json();
+      console.log('MCP Response:', JSON.stringify(result, null, 2));
       
       if (result.error) {
         throw new Error(result.error.message || 'MCP server error');
       }
 
-      return result.result as MCPResponse;
+      const mcpResponse = result.result as MCPResponse;
+      console.log('Parsed MCP Response:', JSON.stringify(mcpResponse, null, 2));
+      
+      return mcpResponse;
     } catch (error) {
       console.error(`Error calling tool ${toolCall.name}:`, error);
       throw error;
