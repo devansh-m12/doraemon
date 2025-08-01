@@ -5,6 +5,7 @@ import { TokenService } from './token/TokenService';
 import { TokenDetailsService } from './token-details/TokenDetailsService';
 import { BalanceService } from './balance/BalanceService';
 import { TracesService } from './traces/TracesService';
+import { HistoryService } from './history/HistoryService';
 import { logger } from '../config/logger';
 
 export class ServiceOrchestrator {
@@ -28,6 +29,7 @@ export class ServiceOrchestrator {
     this.services.set('token-details', new TokenDetailsService(serviceConfig));
     this.services.set('balance', new BalanceService(serviceConfig));
     this.services.set('traces', new TracesService(serviceConfig));
+    this.services.set('history', new HistoryService(serviceConfig));
 
     logger.info(`Initialized ${this.services.size} services`);
   }
