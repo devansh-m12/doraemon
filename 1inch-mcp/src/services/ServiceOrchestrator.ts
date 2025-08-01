@@ -3,6 +3,7 @@ import { BaseService, ToolDefinition, ResourceDefinition, PromptDefinition } fro
 import { SwapService } from './swap/SwapService';
 import { TokenService } from './token/TokenService';
 import { TokenDetailsService } from './token-details/TokenDetailsService';
+import { BalanceService } from './balance/BalanceService';
 import { logger } from '../config/logger';
 
 export class ServiceOrchestrator {
@@ -24,6 +25,7 @@ export class ServiceOrchestrator {
     this.services.set('swap', new SwapService(serviceConfig));
     this.services.set('token', new TokenService(serviceConfig));
     this.services.set('token-details', new TokenDetailsService(serviceConfig));
+    this.services.set('balance', new BalanceService(serviceConfig));
 
     logger.info(`Initialized ${this.services.size} services`);
   }
