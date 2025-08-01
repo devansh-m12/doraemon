@@ -9,6 +9,7 @@ import { PortfolioService } from './portfolio/PortfolioService';
 import { TracesService } from './traces/TracesService';
 import { HistoryService } from './history/HistoryService';
 import { OrderbookService } from './orderbook/OrderbookService';
+import { SpotPriceService } from './spot-price/SpotPriceService';
 import { logger } from '../config/logger';
 
 export class ServiceOrchestrator {
@@ -36,6 +37,7 @@ export class ServiceOrchestrator {
     this.services.set('traces', new TracesService(serviceConfig));
     this.services.set('history', new HistoryService(serviceConfig));
     this.services.set('orderbook', new OrderbookService(serviceConfig));
+    this.services.set('spot-price', new SpotPriceService(serviceConfig));
 
     logger.info(`Initialized ${this.services.size} services`);
   }
