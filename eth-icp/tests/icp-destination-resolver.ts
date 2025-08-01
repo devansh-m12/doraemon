@@ -1,5 +1,5 @@
-import { TokenUtils, OrderConfig, CreateOrderResult, FillOrderResult } from '../../fusion_swap_icp/tests/token-utils'
-import { ICRCUtils, Account, TransferResult, ApproveResult } from '../../fusion_swap_icp/tests/icrc-utils'
+import { TokenUtils, OrderConfig, CreateOrderResult, FillOrderResult } from '../fusion_swap_icp/tests/token-utils'
+import { ICRCUtils, Account, TransferResult, ApproveResult } from '../fusion_swap_icp/tests/icrc-utils'
 import { config } from './config'
 import { createHash } from 'crypto'
 

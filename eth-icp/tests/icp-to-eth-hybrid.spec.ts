@@ -25,8 +25,8 @@ import factoryContract from '../dist/contracts/TestEscrowFactory.sol/TestEscrowF
 import resolverContract from '../dist/contracts/Resolver.sol/Resolver.json'
 import {ICPDestinationResolver} from './icp-destination-resolver'
 // Import fusion utilities from tests
-import {TokenUtils, OrderConfig, CreateOrderResult, FillOrderResult} from '../../fusion_swap_icp/tests/token-utils'
-import {ICRCUtils, Account, TransferResult, ApproveResult} from '../../fusion_swap_icp/tests/icrc-utils'
+import {TokenUtils, OrderConfig, CreateOrderResult, FillOrderResult} from '../fusion_swap_icp/tests/token-utils'
+import {ICRCUtils, Account, TransferResult, ApproveResult} from '../fusion_swap_icp/tests/icrc-utils'
 
 const {Address} = Sdk
 
