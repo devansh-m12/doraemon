@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "1inch-mcp-server": {
+      "command": "node",
+      "args": ["/absolute/path/to/1inch-mcp/dist/index.js"],
+      "env": {
+        "ONEINCH_API_KEY": "your_api_key_here"
+      }
+    }
+  }
+} 
