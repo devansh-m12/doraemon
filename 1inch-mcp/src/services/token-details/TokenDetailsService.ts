@@ -56,7 +56,8 @@ export class TokenDetailsService extends BaseService {
             chain: { type: 'number', description: 'Chain ID' },
             from: { type: 'number', description: 'Start timestamp (UNIX)' },
             to: { type: 'number', description: 'End timestamp (UNIX)' },
-            provider: { type: 'string', description: 'Name of chart provider', default: '1inch' }
+            provider: { type: 'string', description: 'Name of chart provider', default: '1inch' },
+            from_time: { type: 'number', description: 'Optional start time parameter' }
           },
           required: ['chain', 'from', 'to']
         }
@@ -71,7 +72,8 @@ export class TokenDetailsService extends BaseService {
             address: { type: 'string', description: 'Token contract address' },
             from: { type: 'number', description: 'Start timestamp (UNIX)' },
             to: { type: 'number', description: 'End timestamp (UNIX)' },
-            provider: { type: 'string', description: 'Name of chart provider', default: '1inch' }
+            provider: { type: 'string', description: 'Name of chart provider', default: '1inch' },
+            from_time: { type: 'number', description: 'Optional start time parameter' }
           },
           required: ['chain', 'address', 'from', 'to']
         }
@@ -83,10 +85,15 @@ export class TokenDetailsService extends BaseService {
           type: 'object',
           properties: {
             chain: { type: 'number', description: 'Chain ID' },
-            interval: { type: 'string', description: 'Interval (e.g., 1d, 1h, 1w)' },
+            interval: { 
+              type: 'string', 
+              description: 'Interval (5m, 10m, 15m, 30m, 50m, 1h, 2h, 3h, 4h, 6h, 12h, 24h, 2d, 3d, 7d, 14d, 15d, 30d, 60d, 90d, 365d, max)',
+              enum: ['5m', '10m', '15m', '30m', '50m', '1h', '2h', '3h', '4h', '6h', '12h', '24h', '2d', '3d', '7d', '14d', '15d', '30d', '60d', '90d', '365d', 'max']
+            },
             from: { type: 'number', description: 'Start timestamp (UNIX)' },
             to: { type: 'number', description: 'End timestamp (UNIX)' },
-            provider: { type: 'string', description: 'Name of chart provider', default: '1inch' }
+            provider: { type: 'string', description: 'Name of chart provider', default: '1inch' },
+            from_time: { type: 'number', description: 'Optional start time parameter' }
           },
           required: ['chain', 'interval', 'from', 'to']
         }
@@ -99,10 +106,15 @@ export class TokenDetailsService extends BaseService {
           properties: {
             chain: { type: 'number', description: 'Chain ID' },
             address: { type: 'string', description: 'Token contract address' },
-            interval: { type: 'string', description: 'Interval (e.g., 1d, 1h, 1w)' },
+            interval: { 
+              type: 'string', 
+              description: 'Interval (5m, 10m, 15m, 30m, 50m, 1h, 2h, 3h, 4h, 6h, 12h, 24h, 2d, 3d, 7d, 14d, 15d, 30d, 60d, 90d, 365d, max)',
+              enum: ['5m', '10m', '15m', '30m', '50m', '1h', '2h', '3h', '4h', '6h', '12h', '24h', '2d', '3d', '7d', '14d', '15d', '30d', '60d', '90d', '365d', 'max']
+            },
             from: { type: 'number', description: 'Start timestamp (UNIX)' },
             to: { type: 'number', description: 'End timestamp (UNIX)' },
-            provider: { type: 'string', description: 'Name of chart provider', default: '1inch' }
+            provider: { type: 'string', description: 'Name of chart provider', default: '1inch' },
+            from_time: { type: 'number', description: 'Optional start time parameter' }
           },
           required: ['chain', 'address', 'interval', 'from', 'to']
         }
@@ -114,7 +126,11 @@ export class TokenDetailsService extends BaseService {
           type: 'object',
           properties: {
             chain: { type: 'number', description: 'Chain ID' },
-            interval: { type: 'string', description: 'Interval (e.g., 1d, 1h)' },
+            interval: { 
+              type: 'string', 
+              description: 'Interval (5m, 10m, 15m, 30m, 50m, 1h, 2h, 3h, 4h, 6h, 12h, 24h, 2d, 3d, 7d, 14d, 15d, 30d, 60d, 90d, 365d, max)',
+              enum: ['5m', '10m', '15m', '30m', '50m', '1h', '2h', '3h', '4h', '6h', '12h', '24h', '2d', '3d', '7d', '14d', '15d', '30d', '60d', '90d', '365d', 'max']
+            },
             provider: { type: 'string', description: 'Name of chart provider', default: '1inch' }
           },
           required: ['chain', 'interval']
@@ -128,7 +144,11 @@ export class TokenDetailsService extends BaseService {
           properties: {
             chain: { type: 'number', description: 'Chain ID' },
             address: { type: 'string', description: 'Token contract address' },
-            interval: { type: 'string', description: 'Interval (e.g., 1d, 1h)' },
+            interval: { 
+              type: 'string', 
+              description: 'Interval (5m, 10m, 15m, 30m, 50m, 1h, 2h, 3h, 4h, 6h, 12h, 24h, 2d, 3d, 7d, 14d, 15d, 30d, 60d, 90d, 365d, max)',
+              enum: ['5m', '10m', '15m', '30m', '50m', '1h', '2h', '3h', '4h', '6h', '12h', '24h', '2d', '3d', '7d', '14d', '15d', '30d', '60d', '90d', '365d', 'max']
+            },
             provider: { type: 'string', description: 'Name of chart provider', default: '1inch' }
           },
           required: ['chain', 'address', 'interval']
@@ -146,7 +166,11 @@ export class TokenDetailsService extends BaseService {
               items: { type: 'string' },
               description: 'List of token addresses'
             },
-            interval: { type: 'string', description: 'Interval (e.g., 1d, 1h)' },
+            interval: { 
+              type: 'string', 
+              description: 'Interval (5m, 10m, 15m, 30m, 50m, 1h, 2h, 3h, 4h, 6h, 12h, 24h, 2d, 3d, 7d, 14d, 15d, 30d, 60d, 90d, 365d, max)',
+              enum: ['5m', '10m', '15m', '30m', '50m', '1h', '2h', '3h', '4h', '6h', '12h', '24h', '2d', '3d', '7d', '14d', '15d', '30d', '60d', '90d', '365d', 'max']
+            },
             provider: { type: 'string', description: 'Name of chart provider', default: '1inch' }
           },
           required: ['chain', 'addresses', 'interval']
@@ -254,13 +278,16 @@ export class TokenDetailsService extends BaseService {
   }
 
   async getNativeHistoricalPricesRange(params: HistoricalPricesRangeRequest): Promise<HistoricalPricesResponse> {
-    const url = `${this.baseUrl}/token-details/v1.0/historical-prices/range/${params.chain}`;
+    const url = `${this.baseUrl}/token-details/v1.0/charts/range/${params.chain}`;
     const queryParams = new URLSearchParams({
       from: params.from.toString(),
       to: params.to.toString()
     });
     if (params.provider) {
       queryParams.append('provider', params.provider);
+    }
+    if (params.from_time) {
+      queryParams.append('from_time', params.from_time.toString());
     }
 
     const response = await this.makeRequest<HistoricalPricesResponse>(`${url}?${queryParams.toString()}`);
@@ -268,13 +295,16 @@ export class TokenDetailsService extends BaseService {
   }
 
   async getTokenHistoricalPricesRange(params: HistoricalPricesRangeByAddressRequest): Promise<HistoricalPricesResponse> {
-    const url = `${this.baseUrl}/token-details/v1.0/historical-prices/range/${params.chain}/${params.address}`;
+    const url = `${this.baseUrl}/token-details/v1.0/charts/range/${params.chain}/${params.address}`;
     const queryParams = new URLSearchParams({
       from: params.from.toString(),
       to: params.to.toString()
     });
     if (params.provider) {
       queryParams.append('provider', params.provider);
+    }
+    if (params.from_time) {
+      queryParams.append('from_time', params.from_time.toString());
     }
 
     const response = await this.makeRequest<HistoricalPricesResponse>(`${url}?${queryParams.toString()}`);
@@ -282,7 +312,7 @@ export class TokenDetailsService extends BaseService {
   }
 
   async getNativeHistoricalPricesInterval(params: HistoricalPricesIntervalRequest): Promise<HistoricalPricesResponse> {
-    const url = `${this.baseUrl}/token-details/v1.0/historical-prices/interval/${params.chain}`;
+    const url = `${this.baseUrl}/token-details/v1.0/charts/interval/${params.chain}`;
     const queryParams = new URLSearchParams({
       interval: params.interval,
       from: params.from.toString(),
@@ -290,6 +320,9 @@ export class TokenDetailsService extends BaseService {
     });
     if (params.provider) {
       queryParams.append('provider', params.provider);
+    }
+    if (params.from_time) {
+      queryParams.append('from_time', params.from_time.toString());
     }
 
     const response = await this.makeRequest<HistoricalPricesResponse>(`${url}?${queryParams.toString()}`);
@@ -297,7 +330,7 @@ export class TokenDetailsService extends BaseService {
   }
 
   async getTokenHistoricalPricesInterval(params: HistoricalPricesIntervalByAddressRequest): Promise<HistoricalPricesResponse> {
-    const url = `${this.baseUrl}/token-details/v1.0/historical-prices/interval/${params.chain}/${params.address}`;
+    const url = `${this.baseUrl}/token-details/v1.0/charts/interval/${params.chain}/${params.address}`;
     const queryParams = new URLSearchParams({
       interval: params.interval,
       from: params.from.toString(),
@@ -306,13 +339,16 @@ export class TokenDetailsService extends BaseService {
     if (params.provider) {
       queryParams.append('provider', params.provider);
     }
+    if (params.from_time) {
+      queryParams.append('from_time', params.from_time.toString());
+    }
 
     const response = await this.makeRequest<HistoricalPricesResponse>(`${url}?${queryParams.toString()}`);
     return response;
   }
 
   async getNativePriceChange(params: PriceChangeRequest): Promise<PriceChangeResponse> {
-    const url = `${this.baseUrl}/token-details/v1.0/price-change/${params.chain}`;
+    const url = `${this.baseUrl}/token-details/v1.0/prices/change/${params.chain}`;
     const queryParams = new URLSearchParams({
       interval: params.interval
     });
@@ -325,7 +361,7 @@ export class TokenDetailsService extends BaseService {
   }
 
   async getTokenPriceChange(params: PriceChangeByAddressRequest): Promise<PriceChangeResponse> {
-    const url = `${this.baseUrl}/token-details/v1.0/price-change/${params.chain}/${params.address}`;
+    const url = `${this.baseUrl}/token-details/v1.0/prices/change/${params.chain}/${params.address}`;
     const queryParams = new URLSearchParams({
       interval: params.interval
     });
@@ -338,7 +374,7 @@ export class TokenDetailsService extends BaseService {
   }
 
   async getMultipleTokensPriceChange(params: PriceChangeMultipleRequest): Promise<PriceChangeMultipleResponse> {
-    const url = `${this.baseUrl}/token-details/v1.0/price-change/${params.chain}/tokens`;
+    const url = `${this.baseUrl}/token-details/v1.0/prices/change/${params.chain}`;
     const queryParams = new URLSearchParams({
       interval: params.interval
     });
@@ -347,7 +383,7 @@ export class TokenDetailsService extends BaseService {
     }
 
     const body = {
-      addresses: params.addresses
+      tokenAddresses: params.addresses
     };
 
     const response = await this.makePostRequest<PriceChangeMultipleResponse>(`${url}?${queryParams.toString()}`, body);
@@ -368,25 +404,25 @@ Returns details for the native token of a given chain.
 ### 2. GET /token-details/v1.0/details/{chain}/{address}
 Returns details for a specific token by address on a given chain.
 
-### 3. GET /token-details/v1.0/historical-prices/range/{chain}
+### 3. GET /token-details/v1.0/charts/range/{chain}
 Returns historical price data for the native token over a custom time range.
 
-### 4. GET /token-details/v1.0/historical-prices/range/{chain}/{address}
+### 4. GET /token-details/v1.0/charts/range/{chain}/{address}
 Returns historical price data for a specific token over a custom time range.
 
-### 5. GET /token-details/v1.0/historical-prices/interval/{chain}
+### 5. GET /token-details/v1.0/charts/interval/{chain}
 Returns historical USD price data for the native token aggregated by interval.
 
-### 6. GET /token-details/v1.0/historical-prices/interval/{chain}/{address}
+### 6. GET /token-details/v1.0/charts/interval/{chain}/{address}
 Returns historical USD price data for a token aggregated by interval.
 
-### 7. GET /token-details/v1.0/price-change/{chain}
+### 7. GET /token-details/v1.0/prices/change/{chain}
 Returns price change metric for the native token over a specific interval.
 
-### 8. POST /token-details/v1.0/price-change/{chain}/tokens
+### 8. POST /token-details/v1.0/prices/change/{chain}
 Returns price change for a list of token addresses over specific intervals.
 
-### 9. GET /token-details/v1.0/price-change/{chain}/{address}
+### 9. GET /token-details/v1.0/prices/change/{chain}/{address}
 Returns price change metric for a particular token.
 
 ## Common Parameters
@@ -394,7 +430,15 @@ Returns price change metric for a particular token.
 - address: Token contract address (required for specific token endpoints)
 - provider: Chart provider name (optional)
 - from/to: Unix timestamps for historical data (required for historical endpoints)
-- interval: Time interval (1h, 1d, 1w, etc.) (required for interval endpoints)
+- from_time: Optional start time parameter for historical data
+- interval: Time interval (5m, 10m, 15m, 30m, 50m, 1h, 2h, 3h, 4h, 6h, 12h, 24h, 2d, 3d, 7d, 14d, 15d, 30d, 60d, 90d, 365d, max) (required for interval endpoints)
+
+## Supported Intervals
+- 5m, 10m, 15m, 30m, 50m (minutes)
+- 1h, 2h, 3h, 4h, 6h, 12h, 24h (hours)
+- 2d, 3d, 7d, 14d, 15d (days)
+- 30d, 60d, 90d, 365d (months/years)
+- max (maximum available data)
 
 ## Response Format
 All endpoints return JSON responses with comprehensive token information including:
@@ -407,7 +451,7 @@ All endpoints return JSON responses with comprehensive token information includi
 
   private async getSupportedIntervals(): Promise<string> {
     return JSON.stringify({
-      intervals: ['1h', '1d', '1w', '1m', '3m', '6m', '1y'],
+      intervals: ['5m', '10m', '15m', '30m', '50m', '1h', '2h', '3h', '4h', '6h', '12h', '24h', '2d', '3d', '7d', '14d', '15d', '30d', '60d', '90d', '365d', 'max'],
       description: 'Supported time intervals for historical price data'
     });
   }
@@ -437,7 +481,7 @@ Token Details:
 - Market Cap: ${tokenDetails.marketCap ? `$${tokenDetails.marketCap.toLocaleString()}` : 'N/A'}
 - Supply: ${tokenDetails.supply ? tokenDetails.supply.toLocaleString() : 'N/A'}
 
-Historical Data Points: ${historicalData.prices.length}
+Historical Data Points: ${historicalData.d.length}
 Time Range: ${new Date(from * 1000).toLocaleDateString()} to ${new Date(now * 1000).toLocaleDateString()}
 
 Analysis complete. Use the historical_prices_range endpoint for detailed price data.`;

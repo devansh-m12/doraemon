@@ -40,6 +40,7 @@ export interface HistoricalPricesRangeRequest {
   from: number;
   to: number;
   provider?: string;
+  from_time?: number;
 }
 
 export interface HistoricalPricesRangeByAddressRequest {
@@ -48,6 +49,7 @@ export interface HistoricalPricesRangeByAddressRequest {
   from: number;
   to: number;
   provider?: string;
+  from_time?: number;
 }
 
 export interface HistoricalPricesIntervalRequest {
@@ -56,6 +58,7 @@ export interface HistoricalPricesIntervalRequest {
   from: number;
   to: number;
   provider?: string;
+  from_time?: number;
 }
 
 export interface HistoricalPricesIntervalByAddressRequest {
@@ -65,12 +68,20 @@ export interface HistoricalPricesIntervalByAddressRequest {
   from: number;
   to: number;
   provider?: string;
+  from_time?: number;
 }
 
+// Supported intervals matching the reference implementation
+export type SupportedInterval = 
+  | "5m" | "10m" | "15m" | "30m" | "50m" 
+  | "1h" | "2h" | "3h" | "4h" | "6h" | "12h" | "24h" 
+  | "2d" | "3d" | "7d" | "14d" | "15d" | "30d" | "60d" | "90d" | "365d" | "max";
+
 export interface HistoricalPricesResponse {
-  prices: Array<{
-    timestamp: number;
-    price: number;
+  d: Array<{
+    t: number; // timestamp
+    v: number; // value/price
+    p: string; // price string
   }>;
 }
 
@@ -95,19 +106,13 @@ export interface PriceChangeMultipleRequest {
 }
 
 export interface PriceChangeResponse {
-  priceChange: {
-    currentPrice: number;
-    previousPrice: number;
-    change: number;
-    changePercent: number;
-  };
+  inUSD: number;
+  inPercent: number;
 }
 
 export interface PriceChangeMultipleResponse {
   [address: string]: {
-    currentPrice: number;
-    previousPrice: number;
-    change: number;
-    changePercent: number;
+    inUSD: number;
+    inPercent: number;
   };
 } 
