@@ -4,6 +4,7 @@ import { SwapService } from './swap/SwapService';
 import { TokenService } from './token/TokenService';
 import { TokenDetailsService } from './token-details/TokenDetailsService';
 import { BalanceService } from './balance/BalanceService';
+import { PortfolioService } from './portfolio/PortfolioService';
 import { TracesService } from './traces/TracesService';
 import { HistoryService } from './history/HistoryService';
 import { OrderbookService } from './orderbook/OrderbookService';
@@ -29,6 +30,7 @@ export class ServiceOrchestrator {
     this.services.set('token', new TokenService(serviceConfig));
     this.services.set('token-details', new TokenDetailsService(serviceConfig));
     this.services.set('balance', new BalanceService(serviceConfig));
+    this.services.set('portfolio', new PortfolioService(serviceConfig));
     this.services.set('traces', new TracesService(serviceConfig));
     this.services.set('history', new HistoryService(serviceConfig));
     this.services.set('orderbook', new OrderbookService(serviceConfig));
