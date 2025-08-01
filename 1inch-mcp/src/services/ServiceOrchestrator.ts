@@ -11,6 +11,10 @@ import { HistoryService } from './history/HistoryService';
 import { OrderbookService } from './orderbook/OrderbookService';
 import { SpotPriceService } from './spot-price/SpotPriceService';
 import { NFTService } from './nft/NFTService';
+import { TransactionGatewayService } from './transaction-gateway/TransactionGatewayService';
+import { Web3RpcService } from './web3-rpc/Web3RpcService';
+import { ChartsService } from './charts/ChartsService';
+import { DomainService } from './domain/DomainService';
 import { logger } from '../config/logger';
 
 export class ServiceOrchestrator {
@@ -40,6 +44,10 @@ export class ServiceOrchestrator {
     this.services.set('orderbook', new OrderbookService(serviceConfig));
     this.services.set('spot-price', new SpotPriceService(serviceConfig));
     this.services.set('nft', new NFTService(serviceConfig));
+    this.services.set('transaction-gateway', new TransactionGatewayService(serviceConfig));
+    this.services.set('web3-rpc', new Web3RpcService(serviceConfig));
+    this.services.set('charts', new ChartsService(serviceConfig));
+    this.services.set('domain', new DomainService(serviceConfig));
 
     logger.info(`Initialized ${this.services.size} services`);
   }
