@@ -2,7 +2,8 @@ export interface TokenSearchRequest {
   chainId: number;
   query: string;
   limit?: number;
-  ignoreListed?: string;
+  provider?: string;
+  country?: string;
 }
 
 export interface TokenSearchResponse {
@@ -37,6 +38,7 @@ export interface TokenInfoMapResponse {
 export interface AllTokensInfoRequest {
   chainId: number;
   provider?: string;
+  country?: string;
 }
 
 export interface AllTokensInfoResponse {
@@ -46,8 +48,36 @@ export interface AllTokensInfoResponse {
 export interface TokenListRequest {
   chainId: number;
   provider?: string;
+  country?: string;
 }
 
 export interface TokenListResponse {
+  tokens: TokenInfoResponse[];
+}
+
+// New type definitions for v1.3 API endpoints
+export interface MultiChainTokensRequest {
+  provider?: string;
+  country?: string;
+}
+
+export interface MultiChainTokensResponse {
+  [chainId: string]: {
+    [address: string]: TokenInfoResponse;
+  };
+}
+
+export interface SupportedChainsResponse {
+  chains: number[];
+}
+
+export interface TokenCustomRequest {
+  chainId: number;
+  addresses: string;
+  provider?: string;
+  country?: string;
+}
+
+export interface TokenCustomResponse {
   tokens: TokenInfoResponse[];
 } 
