@@ -350,7 +350,7 @@ export class TokenService extends BaseService {
     const queryParams: any = { provider };
     if (country) queryParams.country = country;
     
-    return await this.makeRequest<MultiChainTokensResponse>(`/token/v1.3/multi-chain/list`, queryParams);
+    return await this.makeRequest<MultiChainTokensResponse>(`/token/v1.3/multi-chain/token-list`, queryParams);
   }
 
   async searchMultiChainTokens(params: { query: string; provider?: string; country?: string; limit?: number }): Promise<TokenSearchResponse> {
