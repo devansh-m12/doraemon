@@ -23,7 +23,7 @@ export class TracesService extends BaseService {
         inputSchema: {
           type: 'object',
           properties: {
-            chain: { type: 'string', description: 'Chain name (e.g., ethereum, arbitrum, etc.)' }
+            chain: { type: 'number', description: 'Chain ID (e.g., 1 for Ethereum, 137 for Polygon, etc.)' }
           },
           required: ['chain']
         }
@@ -34,8 +34,8 @@ export class TracesService extends BaseService {
         inputSchema: {
           type: 'object',
           properties: {
-            chain: { type: 'string', description: 'Chain name (e.g., ethereum, arbitrum, etc.)' },
-            blockNumber: { type: 'number', description: 'The block number to trace' }
+            chain: { type: 'number', description: 'Chain ID (e.g., 1 for Ethereum, 137 for Polygon, etc.)' },
+            blockNumber: { type: 'string', description: 'The block number to trace' }
           },
           required: ['chain', 'blockNumber']
         }
@@ -46,8 +46,8 @@ export class TracesService extends BaseService {
         inputSchema: {
           type: 'object',
           properties: {
-            chain: { type: 'string', description: 'Chain name (e.g., ethereum, arbitrum, etc.)' },
-            blockNumber: { type: 'number', description: 'The block number' },
+            chain: { type: 'number', description: 'Chain ID (e.g., 1 for Ethereum, 137 for Polygon, etc.)' },
+            blockNumber: { type: 'string', description: 'The block number' },
             txHash: { type: 'string', description: 'The transaction hash' }
           },
           required: ['chain', 'blockNumber', 'txHash']
@@ -59,11 +59,11 @@ export class TracesService extends BaseService {
         inputSchema: {
           type: 'object',
           properties: {
-            chain: { type: 'string', description: 'Chain name (e.g., ethereum, arbitrum, etc.)' },
-            blockNumber: { type: 'number', description: 'The block number' },
-            txOffset: { type: 'number', description: 'Index (offset) of the transaction in the block (e.g. first transaction is 0)' }
+            chain: { type: 'number', description: 'Chain ID (e.g., 1 for Ethereum, 137 for Polygon, etc.)' },
+            blockNumber: { type: 'string', description: 'The block number' },
+            offset: { type: 'number', description: 'Index (offset) of the transaction in the block (e.g. first transaction is 0)' }
           },
-          required: ['chain', 'blockNumber', 'txOffset']
+          required: ['chain', 'blockNumber', 'offset']
         }
       }
     ];
@@ -92,7 +92,7 @@ export class TracesService extends BaseService {
         name: 'analyze_block_traces',
         description: 'Analyze traces for a specific block',
         arguments: [
-          { name: 'chain', description: 'Chain name', required: true },
+          { name: 'chain', description: 'Chain ID', required: true },
           { name: 'blockNumber', description: 'Block number', required: true }
         ]
       },
@@ -100,7 +100,7 @@ export class TracesService extends BaseService {
         name: 'analyze_transaction_trace',
         description: 'Analyze trace for a specific transaction',
         arguments: [
-          { name: 'chain', description: 'Chain name', required: true },
+          { name: 'chain', description: 'Chain ID', required: true },
           { name: 'blockNumber', description: 'Block number', required: true },
           { name: 'txHash', description: 'Transaction hash', required: true }
         ]
@@ -109,17 +109,21 @@ export class TracesService extends BaseService {
   }
 
   async handleToolCall(name: string, args: any): Promise<any> {
-    switch (name) {
-      case 'get_synced_interval':
-        return await this.getSyncedInterval(args);
-      case 'get_block_trace':
-        return await this.getBlockTrace(args);
-      case 'get_transaction_trace_by_hash':
-        return await this.getTransactionTraceByHash(args);
-      case 'get_transaction_trace_by_offset':
-        return await this.getTransactionTraceByOffset(args);
-      default:
-        throw new Error(`Unknown tool: ${name}`);
+    try {
+      switch (name) {
+        case 'get_synced_interval':
+          return await this.getSyncedInterval(args);
+        case 'get_block_trace':
+          return await this.getBlockTrace(args);
+        case 'get_transaction_trace_by_hash':
+          return await this.getTransactionTraceByHash(args);
+        case 'get_transaction_trace_by_offset':
+          return await this.getTransactionTraceByOffset(args);
+        default:
+          throw new Error(`Unknown tool: ${name}`);
+      }
+    } catch (error) {
+      throw new Error(`Traces API error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -145,28 +149,125 @@ export class TracesService extends BaseService {
     }
   }
 
-  async getSyncedInterval(params: SyncedIntervalRequest): Promise<SyncedIntervalResponse> {
+  async getSyncedInterval(params: { chain: number }): Promise<SyncedIntervalResponse> {
+    // Validate required parameters
+    if (!params.chain) {
+      throw new Error('chain parameter is required. Use 1 for Ethereum, 137 for Polygon, etc.');
+    }
+
     const url = `${this.baseUrl}/traces/v1.0/chain/${params.chain}/synced-interval`;
+    
     const response = await this.makeRequest<SyncedIntervalResponse>(url);
     return response;
   }
 
-  async getBlockTrace(params: BlockTraceRequest): Promise<BlockTraceResponse> {
-    const url = `${this.baseUrl}/traces/v1.0/chain/${params.chain}/block/${params.blockNumber}`;
+  async getBlockTrace(params: { chain: number; blockNumber: string }): Promise<BlockTraceResponse> {
+    // Validate required parameters
+    if (!params.chain) {
+      throw new Error('chain parameter is required. Use 1 for Ethereum, 137 for Polygon, etc.');
+    }
+    if (!params.blockNumber) {
+      throw new Error('blockNumber is required for getBlockTrace endpoint');
+    }
+
+    const url = `${this.baseUrl}/traces/v1.0/chain/${params.chain}/block-trace/${params.blockNumber}`;
+    
     const response = await this.makeRequest<BlockTraceResponse>(url);
     return response;
   }
 
-  async getTransactionTraceByHash(params: TransactionTraceByHashRequest): Promise<TransactionTraceByHashResponse> {
-    const url = `${this.baseUrl}/traces/v1.0/chain/${params.chain}/block/${params.blockNumber}/tx/${params.txHash}`;
+  async getTransactionTraceByHash(params: { chain: number; blockNumber: string; txHash: string }): Promise<TransactionTraceByHashResponse> {
+    // Validate required parameters
+    if (!params.chain) {
+      throw new Error('chain parameter is required. Use 1 for Ethereum, 137 for Polygon, etc.');
+    }
+    if (!params.blockNumber || !params.txHash) {
+      throw new Error('blockNumber and txHash are required for getTransactionTraceByHash endpoint');
+    }
+
+    const url = `${this.baseUrl}/traces/v1.0/chain/${params.chain}/block-trace/${params.blockNumber}/tx-hash/${params.txHash}`;
+    
     const response = await this.makeRequest<TransactionTraceByHashResponse>(url);
     return response;
   }
 
-  async getTransactionTraceByOffset(params: TransactionTraceByOffsetRequest): Promise<TransactionTraceByOffsetResponse> {
-    const url = `${this.baseUrl}/traces/v1.0/chain/${params.chain}/block/${params.blockNumber}/tx-offset/${params.txOffset}`;
+  async getTransactionTraceByOffset(params: { chain: number; blockNumber: string; offset: number }): Promise<TransactionTraceByOffsetResponse> {
+    // Validate required parameters
+    if (!params.chain) {
+      throw new Error('chain parameter is required. Use 1 for Ethereum, 137 for Polygon, etc.');
+    }
+    if (!params.blockNumber || params.offset === undefined) {
+      throw new Error('blockNumber and offset are required for getTransactionTraceByOffset endpoint');
+    }
+
+    const url = `${this.baseUrl}/traces/v1.0/chain/${params.chain}/block-trace/${params.blockNumber}/offset/${params.offset}`;
+    
     const response = await this.makeRequest<TransactionTraceByOffsetResponse>(url);
     return response;
+  }
+
+  // Main tracesAPI function for backward compatibility
+  async tracesAPI(params: {
+    endpoint?: 'getSyncedInterval' | 'getBlockTraceByNumber' | 'getTransactionTraceByHash' | 'getTransactionTraceByOffset';
+    chain?: number;
+    blockNumber?: string;
+    txHash?: string;
+    offset?: number;
+  }): Promise<any> {
+    try {
+      // If no parameters provided, default to getSyncedInterval for Ethereum
+      if (!params.endpoint && !params.chain) {
+        return await this.getSyncedInterval({ chain: 1 });
+      }
+      
+      // Validate required parameters
+      if (!params.endpoint) {
+        throw new Error('endpoint parameter is required. Must be one of: getSyncedInterval, getBlockTraceByNumber, getTransactionTraceByHash, getTransactionTraceByOffset');
+      }
+      
+      if (!params.chain) {
+        throw new Error('chain parameter is required. Use 1 for Ethereum, 137 for Polygon, etc.');
+      }
+
+      switch (params.endpoint) {
+        case 'getSyncedInterval':
+          return await this.getSyncedInterval({ chain: params.chain });
+
+        case 'getBlockTraceByNumber':
+          if (!params.blockNumber) {
+            throw new Error('blockNumber is required for getBlockTraceByNumber endpoint');
+          }
+          return await this.getBlockTrace({ 
+            chain: params.chain, 
+            blockNumber: params.blockNumber 
+          });
+
+        case 'getTransactionTraceByHash':
+          if (!params.blockNumber || !params.txHash) {
+            throw new Error('blockNumber and txHash are required for getTransactionTraceByHash endpoint');
+          }
+          return await this.getTransactionTraceByHash({ 
+            chain: params.chain, 
+            blockNumber: params.blockNumber, 
+            txHash: params.txHash 
+          });
+
+        case 'getTransactionTraceByOffset':
+          if (!params.blockNumber || params.offset === undefined) {
+            throw new Error('blockNumber and offset are required for getTransactionTraceByOffset endpoint');
+          }
+          return await this.getTransactionTraceByOffset({ 
+            chain: params.chain, 
+            blockNumber: params.blockNumber, 
+            offset: params.offset 
+          });
+
+        default:
+          throw new Error(`Unknown endpoint: ${params.endpoint}. Must be one of: getSyncedInterval, getBlockTraceByNumber, getTransactionTraceByHash, getTransactionTraceByOffset`);
+      }
+    } catch (error) {
+      throw new Error(`Traces API error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 
   private async getTracesDocumentation(): Promise<string> {
@@ -181,52 +282,50 @@ The Traces API provides comprehensive transaction tracing capabilities across mu
 Returns the range of blocks for which transaction traces are currently indexed and available for the specified chain.
 
 **Parameters:**
-- chain (path): Chain name (e.g., ethereum, arbitrum, etc.)
+- chain (path): Chain ID (e.g., 1 for Ethereum, 137 for Polygon, etc.)
 
 **Response:**
-- fromBlock: Starting block number
-- toBlock: Ending block number
-- chain: Chain name
+- from: Starting block number
+- to: Ending block number
 
-### 2. GET /traces/v1.0/chain/{chain}/block/{block_number}
+### 2. GET /traces/v1.0/chain/{chain}/block-trace/{block_number}
 Fetches the full trace of all transactions and contract operations for an entire block.
 
 **Parameters:**
-- chain (path): Chain name (e.g., ethereum, arbitrum, etc.)
+- chain (path): Chain ID (e.g., 1 for Ethereum, 137 for Polygon, etc.)
 - block_number (path): The block number to trace
 
 **Response:**
-- blockNumber: The traced block number
-- chain: Chain name
+- type: Response type
+- version: API version
+- number: The traced block number
+- blockHash: Block hash
+- blockTimestamp: Block timestamp
 - traces: Array of transaction traces
 
-### 3. GET /traces/v1.0/chain/{chain}/block/{block_number}/tx/{tx_hash}
+### 3. GET /traces/v1.0/chain/{chain}/block-trace/{block_number}/tx-hash/{tx_hash}
 Returns step-by-step trace for a specific transaction identified by its hash within the specified block.
 
 **Parameters:**
-- chain (path): Chain name (e.g., ethereum, arbitrum, etc.)
+- chain (path): Chain ID (e.g., 1 for Ethereum, 137 for Polygon, etc.)
 - block_number (path): The block number
 - tx_hash (path): The transaction hash
 
 **Response:**
-- txHash: Transaction hash
-- blockNumber: Block number
-- chain: Chain name
-- trace: Array of trace steps
+- transactionTrace: Array of trace steps
+- type: Response type
 
-### 4. GET /traces/v1.0/chain/{chain}/block/{block_number}/tx-offset/{tx_offset}
+### 4. GET /traces/v1.0/chain/{chain}/block-trace/{block_number}/offset/{tx_offset}
 Returns the trace for the transaction at the specified index within the block.
 
 **Parameters:**
-- chain (path): Chain name (e.g., ethereum, arbitrum, etc.)
+- chain (path): Chain ID (e.g., 1 for Ethereum, 137 for Polygon, etc.)
 - block_number (path): The block number
 - tx_offset (path): Index (offset) of the transaction in the block (e.g. first transaction is 0)
 
 **Response:**
-- txHash: Transaction hash
-- blockNumber: Block number
-- chain: Chain name
-- trace: Array of trace steps
+- transactionTrace: Array of trace steps
+- type: Response type
 
 ## Trace Step Structure
 Each trace step contains:
@@ -250,18 +349,18 @@ All endpoints require API Key authentication via header.
   private async getSupportedChains(): Promise<string> {
     return JSON.stringify({
       chains: [
-        { name: 'ethereum', description: 'Ethereum Mainnet' },
-        { name: 'arbitrum', description: 'Arbitrum One' },
-        { name: 'polygon', description: 'Polygon' },
-        { name: 'bsc', description: 'BNB Smart Chain' },
-        { name: 'avalanche', description: 'Avalanche C-Chain' },
-        { name: 'optimism', description: 'Optimism' },
-        { name: 'base', description: 'Base' },
-        { name: 'fantom', description: 'Fantom Opera' },
-        { name: 'zksync', description: 'zkSync Era' },
-        { name: 'linea', description: 'Linea' },
-        { name: 'scroll', description: 'Scroll' },
-        { name: 'blast', description: 'Blast' }
+        { id: 1, name: 'ethereum', description: 'Ethereum Mainnet' },
+        { id: 137, name: 'polygon', description: 'Polygon' },
+        { id: 56, name: 'bsc', description: 'BNB Smart Chain' },
+        { id: 42161, name: 'arbitrum', description: 'Arbitrum One' },
+        { id: 10, name: 'optimism', description: 'Optimism' },
+        { id: 8453, name: 'base', description: 'Base' },
+        { id: 43114, name: 'avalanche', description: 'Avalanche C-Chain' },
+        { id: 250, name: 'fantom', description: 'Fantom Opera' },
+        { id: 324, name: 'zksync', description: 'zkSync Era' },
+        { id: 59144, name: 'linea', description: 'Linea' },
+        { id: 534352, name: 'scroll', description: 'Scroll' },
+        { id: 81457, name: 'blast', description: 'Blast' }
       ],
       description: 'Supported blockchain chains for traces queries'
     });
@@ -273,32 +372,34 @@ All endpoints require API Key authentication via header.
     // Get synced interval first
     const syncedInterval = await this.getSyncedInterval({ chain });
     
-    if (blockNumber < syncedInterval.fromBlock || blockNumber > syncedInterval.toBlock) {
-      return `Block ${blockNumber} is not available for tracing on ${chain}. Available range: ${syncedInterval.fromBlock} to ${syncedInterval.toBlock}`;
+    if (blockNumber < syncedInterval.from || blockNumber > syncedInterval.to) {
+      return `Block ${blockNumber} is not available for tracing on chain ${chain}. Available range: ${syncedInterval.from} to ${syncedInterval.to}`;
     }
     
     // Get block trace
     const blockTrace = await this.getBlockTrace({ chain, blockNumber });
     
-    let analysis = `Block Trace Analysis for Block ${blockNumber} on ${chain}:
+    let analysis = `Block Trace Analysis for Block ${blockNumber} on chain ${chain}:
 
 Total Transactions: ${blockTrace.traces.length}
 
 Transaction Details:`;
     
-    blockTrace.traces.forEach((tx, index) => {
+    blockTrace.traces.forEach((tx: any, index) => {
       analysis += `\n${index + 1}. Transaction ${tx.txHash} (Offset: ${tx.txOffset})`;
-      analysis += `\n   - Trace Steps: ${tx.trace.length}`;
+      analysis += `\n   - Trace Steps: ${tx.trace ? tx.trace.length : 0}`;
       
-      // Count different types of operations
-      const operationTypes = tx.trace.reduce((acc, step) => {
-        acc[step.type] = (acc[step.type] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
-      
-      Object.entries(operationTypes).forEach(([type, count]) => {
-        analysis += `\n   - ${type}: ${count}`;
-      });
+      if (tx.trace) {
+        // Count different types of operations
+        const operationTypes = tx.trace.reduce((acc: Record<string, number>, step: any) => {
+          acc[step.type] = (acc[step.type] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+        
+        Object.entries(operationTypes).forEach(([type, count]) => {
+          analysis += `\n   - ${type}: ${count}`;
+        });
+      }
     });
 
     return analysis;
@@ -310,37 +411,38 @@ Transaction Details:`;
     // Get synced interval first
     const syncedInterval = await this.getSyncedInterval({ chain });
     
-    if (blockNumber < syncedInterval.fromBlock || blockNumber > syncedInterval.toBlock) {
-      return `Block ${blockNumber} is not available for tracing on ${chain}. Available range: ${syncedInterval.fromBlock} to ${syncedInterval.toBlock}`;
+    if (blockNumber < syncedInterval.from || blockNumber > syncedInterval.to) {
+      return `Block ${blockNumber} is not available for tracing on chain ${chain}. Available range: ${syncedInterval.from} to ${syncedInterval.to}`;
     }
     
     // Get transaction trace
     const txTrace = await this.getTransactionTraceByHash({ chain, blockNumber, txHash });
     
-    let analysis = `Transaction Trace Analysis for ${txHash} on ${chain}:
+    let analysis = `Transaction Trace Analysis for ${txHash} on chain ${chain}:
 
-Block Number: ${txTrace.blockNumber}
-Total Trace Steps: ${txTrace.trace.length}
+Total Trace Steps: ${txTrace.transactionTrace ? txTrace.transactionTrace.length : 0}
 
 Trace Step Analysis:`;
     
-    // Count different types of operations
-    const operationTypes = txTrace.trace.reduce((acc, step) => {
-      acc[step.type] = (acc[step.type] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-    
-    Object.entries(operationTypes).forEach(([type, count]) => {
-      analysis += `\n- ${type}: ${count}`;
-    });
-    
-    // Check for errors
-    const errorSteps = txTrace.trace.filter(step => step.error);
-    if (errorSteps.length > 0) {
-      analysis += `\n\nErrors Found: ${errorSteps.length}`;
-      errorSteps.forEach((step, index) => {
-        analysis += `\n${index + 1}. ${step.error}`;
+    if (txTrace.transactionTrace) {
+      // Count different types of operations
+      const operationTypes = txTrace.transactionTrace.reduce((acc: Record<string, number>, step: any) => {
+        acc[step.type] = (acc[step.type] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      
+      Object.entries(operationTypes).forEach(([type, count]) => {
+        analysis += `\n- ${type}: ${count}`;
       });
+      
+      // Check for errors
+      const errorSteps = txTrace.transactionTrace.filter((step: any) => step.error);
+      if (errorSteps.length > 0) {
+        analysis += `\n\nErrors Found: ${errorSteps.length}`;
+        errorSteps.forEach((step: any, index) => {
+          analysis += `\n${index + 1}. ${step.error}`;
+        });
+      }
     }
 
     return analysis;

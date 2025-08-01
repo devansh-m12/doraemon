@@ -3,9 +3,8 @@ export interface SyncedIntervalRequest {
 }
 
 export interface SyncedIntervalResponse {
-  fromBlock: number;
-  toBlock: number;
-  chain: string;
+  from: number;
+  to: number;
 }
 
 export interface BlockTraceRequest {
@@ -14,9 +13,12 @@ export interface BlockTraceRequest {
 }
 
 export interface BlockTraceResponse {
-  blockNumber: number;
-  chain: string;
-  traces: TransactionTrace[];
+  type: string;
+  version: string;
+  number: number;
+  blockHash: string;
+  blockTimestamp: string;
+  traces: any[];
 }
 
 export interface TransactionTrace {
@@ -41,10 +43,8 @@ export interface TransactionTraceByHashRequest {
 }
 
 export interface TransactionTraceByHashResponse {
-  txHash: string;
-  blockNumber: number;
-  chain: string;
-  trace: TraceStep[];
+  transactionTrace: any[];
+  type: string;
 }
 
 export interface TransactionTraceByOffsetRequest {
@@ -54,8 +54,6 @@ export interface TransactionTraceByOffsetRequest {
 }
 
 export interface TransactionTraceByOffsetResponse {
-  txHash: string;
-  blockNumber: number;
-  chain: string;
-  trace: TraceStep[];
+  transactionTrace: any[];
+  type: string;
 } 

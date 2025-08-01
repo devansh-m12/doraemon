@@ -151,7 +151,6 @@ describe('TokenService', () => {
 
     describe('getSingleTokenInfo', () => {
       it('should get single token info by address', async () => {
-        // This endpoint returns 404, likely deprecated
         try {
           const result = await tokenService.getSingleTokenInfo({
             chainId: testChain,
@@ -172,7 +171,10 @@ describe('TokenService', () => {
 
     describe('getMultiChainTokens', () => {
       it('should get multi-chain tokens', async () => {
-        const result = await tokenService.getMultiChainTokens({});
+        const result = await tokenService.getMultiChainTokens({
+            provider: '1inch',
+            country: 'US'
+        });
 
         expect(result).toBeDefined();
         expect(typeof result).toBe('object');
