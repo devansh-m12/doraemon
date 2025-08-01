@@ -16,6 +16,7 @@ import { Web3RpcService } from './web3-rpc/Web3RpcService';
 import { ChartsService } from './charts/ChartsService';
 import { DomainService } from './domain/DomainService';
 import { logger } from '../config/logger';
+import { IntentSwapService } from './intent-swap/IntentSwapService';
 
 export class ServiceOrchestrator {
   private services: Map<string, BaseService>;
@@ -48,7 +49,7 @@ export class ServiceOrchestrator {
     this.services.set('web3-rpc', new Web3RpcService(serviceConfig));
     this.services.set('charts', new ChartsService(serviceConfig));
     this.services.set('domain', new DomainService(serviceConfig));
-
+    this.services.set('intent-swap', new IntentSwapService(serviceConfig));
     logger.info(`Initialized ${this.services.size} services`);
   }
 
