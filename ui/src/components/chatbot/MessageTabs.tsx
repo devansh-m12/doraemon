@@ -3,6 +3,13 @@
 import { useState } from 'react';
 import { MessageCircle, Zap } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
+import remarkMath from 'remark-math';
+import rehypeSlug from 'rehype-slug';
+import rehypeAutolinkHeadings from 'rehype-autolink-headings';
+import rehypeHighlight from 'rehype-highlight';
+import rehypeKatex from 'rehype-katex';
 import ToolCallsDisplay from './ToolCallsDisplay';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -58,7 +65,21 @@ export default function MessageTabs({ content, toolCalls }: MessageTabsProps) {
       <div className="min-h-[100px] min-w-[240px] sm:min-w-[280px]">
         {activeTab === 'message' && (
           <div className="text-sm leading-relaxed prose prose-sm max-w-none dark:prose-invert">
-            <ReactMarkdown>{content}</ReactMarkdown>
+            <ReactMarkdown
+              remarkPlugins={[
+                remarkGfm,
+                remarkBreaks,
+                remarkMath,
+              ]}
+              rehypePlugins={[
+                rehypeSlug,
+                rehypeAutolinkHeadings,
+                rehypeHighlight,
+                rehypeKatex,
+              ]}
+            >
+              {content}
+            </ReactMarkdown>
           </div>
         )}
         

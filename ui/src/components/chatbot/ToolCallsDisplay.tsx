@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, Code, Zap } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
@@ -11,6 +11,7 @@ interface ToolCall {
   name: string;
   arguments: any;
   result: any;
+  description: string;
 }
 
 interface ToolCallsDisplayProps {
@@ -103,16 +104,21 @@ export default function ToolCallsDisplay({ toolCalls }: ToolCallsDisplayProps) {
         {toolCalls.map((tool, index) => (
           <Card key={index} className="border-border/50 dark:border-border/60 min-w-[240px] sm:min-w-[280px]">
             <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Code className="w-4 h-4 text-primary dark:text-primary/90" />
-                  <CardTitle className="text-sm font-medium text-foreground dark:text-foreground">
-                    {tool.name}
-                  </CardTitle>
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center space-x-2 mb-1">
+                    <Code className="w-4 h-4 text-primary dark:text-primary/90" />
+                    <CardTitle className="text-sm font-medium text-foreground dark:text-foreground">
+                      {tool.name}
+                    </CardTitle>
+                  </div>
+                  <CardDescription className="text-xs text-muted-foreground dark:text-muted-foreground/80 ml-6">
+                    {tool.description}
+                  </CardDescription>
                 </div>
                 <button
                   onClick={() => toggleTool(index)}
-                  className="p-1 rounded hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/80 dark:hover:text-accent-foreground transition-colors"
+                  className="p-1 rounded hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/80 dark:hover:text-accent-foreground transition-colors ml-2"
                 >
                   {expandedTools.has(index) ? (
                     <ChevronDown className="w-4 h-4" />

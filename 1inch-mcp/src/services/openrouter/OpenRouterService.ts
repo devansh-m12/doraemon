@@ -25,6 +25,7 @@ export type OpenRouterResponse = {
   functionCalls?: Array<{
     name: string;
     arguments: Record<string, any>;
+    description: string;
     result: any;
   }>;
 }
@@ -253,6 +254,10 @@ export class OpenRouterService extends BaseService {
       logger.info(`Raw function call - name: ${name}, arguments: ${argStr}`);
       const args = JSON.parse(argStr || "{}");
       
+      // Get the tool description from the orchestrator
+      const toolInfo = this.orchestrator?.getToolInfo(name);
+      const description = toolInfo?.description || '';
+      
       logger.info(`Calling function: ${name} with args:`, args);
       
       try {
@@ -260,6 +265,7 @@ export class OpenRouterService extends BaseService {
         functionCalls.push({
           name,
           arguments: args,
+          description,
           result,
         });
         logger.info(`Function ${name} completed successfully`);
@@ -268,6 +274,7 @@ export class OpenRouterService extends BaseService {
         functionCalls.push({
           name,
           arguments: args,
+          description,
           result: { error: error instanceof Error ? error.message : String(error) },
         });
       }
@@ -344,7 +351,11 @@ export class OpenRouterService extends BaseService {
         .map((tool: ToolDefinition) => ({
           name: tool.name,
           description: tool.description,
-          parameters: tool.inputSchema
+          parameters: {
+            type: tool.inputSchema.type,
+            properties: tool.inputSchema.properties,
+            required: tool.inputSchema.required
+          }
         }));
     }
     

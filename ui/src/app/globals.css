@@ -186,16 +186,36 @@
   @apply italic;
 }
 
+.prose img {
+  @apply max-w-full h-auto rounded-lg;
+}
+
+.prose blockquote {
+  @apply border-l-4 border-primary/30 pl-4 italic my-4 bg-muted/20 py-2 rounded-r-lg;
+}
+
+.prose code {
+  @apply bg-muted px-1 py-0.5 rounded text-sm font-mono text-primary;
+}
+
 .prose table {
-  @apply w-full border-collapse mb-4;
+  @apply w-full border-collapse mb-4 border border-border rounded-lg overflow-hidden;
 }
 
 .prose th {
-  @apply border border-border px-3 py-2 text-left font-medium;
+  @apply border border-border px-3 py-2 text-left font-medium bg-muted/50;
 }
 
 .prose td {
   @apply border border-border px-3 py-2;
+}
+
+.prose tr:nth-child(even) {
+  @apply bg-muted/20;
+}
+
+.prose tr:hover {
+  @apply bg-muted/30;
 }
 
 .prose hr {
