@@ -3,24 +3,15 @@
 import type React from "react";
 import { useState, useRef, useEffect } from "react";
 import { mcpClient } from '../../lib/mcp-client';
+import { chatStorage, ChatSession, Message } from '../../lib/chat-storage';
 import ChatHeader from './ChatHeader';
 import ChatMessages from './ChatMessages';
 import ChatInput from './ChatInput';
 import WelcomeCard from './WelcomeCard';
+import SessionSidebar from './SessionSidebar';
 
 type ActiveButton = "none" | "add" | "deepSearch" | "think";
 type MessageType = "user" | "system";
-
-interface Message {
-  id: string;
-  content: string;
-  type: MessageType;
-  completed?: boolean;
-  newSection?: boolean;
-  role?: 'user' | 'assistant';
-  timestamp?: Date;
-  toolCalls?: any[];
-}
 
 interface MessageSection {
   id: string;
@@ -68,6 +59,11 @@ export default function ChatInterface() {
   const mainContainerRef = useRef<HTMLDivElement>(null);
   const selectionStateRef = useRef<{ start: number | null; end: number | null }>({ start: null, end: null });
 
+  // Session management state
+  const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [sidebarRefreshTrigger, setSidebarRefreshTrigger] = useState(0);
+
   // Chat state
   const [chatState, setChatState] = useState<ChatState>({
     messages: [],
@@ -87,6 +83,22 @@ export default function ChatInterface() {
   useEffect(() => {
     checkConnection();
   }, []);
+
+  // Initialize session on mount
+  useEffect(() => {
+    initializeSession();
+  }, []);
+
+  // Load session messages when current session changes
+  useEffect(() => {
+    if (currentSession) {
+      setMessages(currentSession.messages);
+      setChatState(prev => ({
+        ...prev,
+        conversationId: currentSession.id
+      }));
+    }
+  }, [currentSession]);
 
   // Check if device is mobile and get viewport height
   useEffect(() => {
@@ -202,6 +214,42 @@ export default function ChatInterface() {
     }
   };
 
+  // Session management functions
+  const initializeSession = () => {
+    const session = chatStorage.ensureSessionExists();
+    setCurrentSession(session);
+  };
+
+  const handleNewSession = () => {
+    const newSession = chatStorage.createSession();
+    setCurrentSession(newSession);
+    setMessages([]);
+    setMessageSections([]);
+    setCompletedMessages(new Set());
+    setActiveSectionId(null);
+    setIsSidebarOpen(false);
+    setSidebarRefreshTrigger(prev => prev + 1); // Trigger sidebar refresh
+  };
+
+  const handleSessionSelect = (session: ChatSession) => {
+    setCurrentSession(session);
+    setIsSidebarOpen(false);
+  };
+
+  const handleToggleSidebar = () => {
+    setIsSidebarOpen(!isSidebarOpen);
+  };
+
+  const handleClearConversation = () => {
+    if (currentSession) {
+      chatStorage.updateSession(currentSession.id, { messages: [] });
+      setMessages([]);
+      setMessageSections([]);
+      setCompletedMessages(new Set());
+      setActiveSectionId(null);
+    }
+  };
+
   // Calculate available content height
   const getContentHeight = () => {
     return viewportHeight - TOP_PADDING - BOTTOM_PADDING - ADDITIONAL_OFFSET;
@@ -277,7 +325,7 @@ export default function ChatInterface() {
   };
 
   const sendMessage = async () => {
-    if (!inputValue.trim() || isStreaming || !chatState.isConnected) return;
+    if (!inputValue.trim() || isStreaming || !chatState.isConnected || !currentSession) return;
 
     const userMessage: Message = {
       id: `user-${Date.now()}`,
@@ -302,8 +350,9 @@ export default function ChatInterface() {
       textareaRef.current.style.height = "auto";
     }
 
-    // Add the message
+    // Add the message to state and storage
     setMessages((prev) => [...prev, userMessage]);
+    chatStorage.addMessage(currentSession.id, userMessage);
 
     // Only focus the textarea on desktop, not on mobile
     if (!isMobile) {
@@ -322,16 +371,18 @@ export default function ChatInterface() {
     const messageId = Date.now().toString();
     setStreamingMessageId(messageId);
 
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: messageId,
-        content: "",
-        type: "system",
-        role: 'assistant',
-        timestamp: new Date()
-      },
-    ]);
+    const aiMessage: Message = {
+      id: messageId,
+      content: "",
+      type: "system",
+      role: 'assistant',
+      timestamp: new Date()
+    };
+
+    setMessages((prev) => [...prev, aiMessage]);
+    if (currentSession) {
+      chatStorage.addMessage(currentSession.id, aiMessage);
+    }
 
     // Add a delay before the second vibration
     setTimeout(() => {
@@ -349,24 +400,56 @@ export default function ChatInterface() {
         }
       });
 
-      const aiResponse = response?.data.response || 'No response received';
+      // Handle different response structures
+      let aiResponse = 'No response received';
+      let toolCalls = null;
+
+      // Check for new MCP response structure with content array
+      if (response?.content && Array.isArray(response.content)) {
+        const textContent = response.content.find(item => item.type === 'text');
+        if (textContent?.text) {
+          try {
+            const parsedContent = JSON.parse(textContent.text);
+            if (parsedContent.success && parsedContent.data?.response) {
+              aiResponse = parsedContent.data.response;
+              toolCalls = parsedContent.data.functionCalls;
+            }
+          } catch (e) {
+            // If parsing fails, use the text directly
+            aiResponse = textContent.text;
+          }
+        }
+      } else if (response?.result?.data?.response) {
+        aiResponse = response.result.data.response;
+        toolCalls = response.result.data.functionCalls;
+      } else if (response?.data?.response) {
+        aiResponse = response.data.response;
+        toolCalls = response.data.functionCalls;
+      } else if (typeof response === 'string') {
+        aiResponse = response;
+      }
 
       // Stream the text
       await simulateTextStreaming(aiResponse);
 
       // Update with complete message
+      const updatedMessage = {
+        content: aiResponse,
+        completed: true,
+        toolCalls: toolCalls
+      };
+
       setMessages((prev) =>
         prev.map((msg) => 
           msg.id === messageId 
-            ? { 
-                ...msg, 
-                content: aiResponse, 
-                completed: true,
-                toolCalls: response?.data.functionCalls 
-              } 
+            ? { ...msg, ...updatedMessage } 
             : msg
         ),
       );
+
+      if (currentSession) {
+        chatStorage.updateMessage(currentSession.id, messageId, updatedMessage);
+      }
 
       // Add to completed messages set
       setCompletedMessages((prev) => new Set(prev).add(messageId));
@@ -382,13 +465,22 @@ export default function ChatInterface() {
       const errorResponse = 'Sorry, I encountered an error. Please try again.';
       await simulateTextStreaming(errorResponse);
 
+      const errorMessageUpdate = {
+        content: errorResponse,
+        completed: true
+      };
+
       setMessages((prev) =>
         prev.map((msg) => 
           msg.id === messageId 
-            ? { ...msg, content: errorResponse, completed: true } 
+            ? { ...msg, ...errorMessageUpdate } 
             : msg
         ),
       );
+
+      if (currentSession) {
+        chatStorage.updateMessage(currentSession.id, messageId, errorMessageUpdate);
+      }
 
       setCompletedMessages((prev) => new Set(prev).add(messageId));
       if (navigator.vibrate) {
@@ -452,11 +544,7 @@ export default function ChatInterface() {
   };
 
   const clearConversation = () => {
-    setMessages([]);
-    setChatState(prev => ({
-      ...prev,
-      conversationId: `conv_${Date.now()}`
-    }));
+    handleClearConversation();
   };
 
   const shouldApplyHeight = (sectionIndex: number) => {
@@ -464,78 +552,100 @@ export default function ChatInterface() {
   };
 
   return (
-    <div
-      ref={mainContainerRef}
-      className="bg-gray-50 flex flex-col overflow-hidden"
-      style={{ height: isMobile ? `${viewportHeight}px` : "100svh" }}
-    >
-      <ChatHeader 
-        isConnected={chatState.isConnected}
-        onClearConversation={clearConversation}
+    <div className="flex h-screen bg-gray-50">
+      {/* Sidebar */}
+      <SessionSidebar
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+        currentSessionId={currentSession?.id || ''}
+        onSessionSelect={handleSessionSelect}
+        onNewSession={handleNewSession}
+        refreshTrigger={sidebarRefreshTrigger}
       />
 
-      <div ref={chatContainerRef} className="flex-grow pb-32 pt-12 px-4 overflow-y-auto">
-        <div className="max-w-3xl mx-auto space-y-4">
-          {messageSections.length === 0 && (
-            <WelcomeCard />
-          )}
+      {/* Main Chat Interface */}
+      <div
+        ref={mainContainerRef}
+        className="flex-1 flex flex-col overflow-hidden relative"
+        style={{ height: isMobile ? `${viewportHeight}px` : "100svh" }}
+      >
+        <ChatHeader 
+          isConnected={chatState.isConnected}
+          onClearConversation={clearConversation}
+          onToggleSidebar={handleToggleSidebar}
+          onNewSession={handleNewSession}
+        />
 
-          {messageSections.map((section, sectionIndex) => (
-            <div
-              key={section.id}
-              ref={sectionIndex === messageSections.length - 1 && section.isNewSection ? newSectionRef : null}
-            >
-              {section.isNewSection && (
-                <div
-                  style={
-                    section.isActive && shouldApplyHeight(section.sectionIndex)
-                      ? { height: `${getContentHeight()}px` }
-                      : {}
-                  }
-                  className="pt-4 flex flex-col justify-start"
-                >
+        <div 
+          ref={chatContainerRef} 
+          className="flex-grow overflow-y-auto px-4"
+          style={{ 
+            paddingTop: '60px', // Account for fixed header
+            paddingBottom: '120px' // Account for input area
+          }}
+        >
+          <div className="max-w-3xl mx-auto space-y-4">
+            {messageSections.length === 0 && (
+              <WelcomeCard />
+            )}
+
+            {messageSections.map((section, sectionIndex) => (
+              <div
+                key={section.id}
+                ref={sectionIndex === messageSections.length - 1 && section.isNewSection ? newSectionRef : null}
+              >
+                {section.isNewSection && (
+                  <div
+                    style={
+                      section.isActive && shouldApplyHeight(section.sectionIndex)
+                        ? { height: `${getContentHeight()}px` }
+                        : {}
+                    }
+                    className="pt-4 flex flex-col justify-start"
+                  >
+                    <ChatMessages 
+                      messages={section.messages}
+                      streamingMessageId={streamingMessageId}
+                      streamingWords={streamingWords}
+                      completedMessages={completedMessages}
+                    />
+                  </div>
+                )}
+
+                {!section.isNewSection && (
                   <ChatMessages 
                     messages={section.messages}
                     streamingMessageId={streamingMessageId}
                     streamingWords={streamingWords}
                     completedMessages={completedMessages}
                   />
-                </div>
-              )}
-
-              {!section.isNewSection && (
-                <ChatMessages 
-                  messages={section.messages}
-                  streamingMessageId={streamingMessageId}
-                  streamingWords={streamingWords}
-                  completedMessages={completedMessages}
-                />
-              )}
-            </div>
-          ))}
-          <div ref={messagesEndRef} />
+                )}
+              </div>
+            ))}
+            <div ref={messagesEndRef} />
+          </div>
         </div>
-      </div>
 
-      <ChatInput
-        inputValue={inputValue}
-        setInputValue={setInputValue}
-        hasTyped={hasTyped}
-        setHasTyped={setHasTyped}
-        activeButton={activeButton}
-        setActiveButton={setActiveButton}
-        isStreaming={isStreaming}
-        isConnected={chatState.isConnected}
-        isMobile={isMobile}
-        textareaRef={textareaRef}
-        inputContainerRef={inputContainerRef}
-        handleInputChange={handleInputChange}
-        handleSubmit={handleSubmit}
-        handleKeyDown={handleKeyDown}
-        handleInputContainerClick={handleInputContainerClick}
-        toggleButton={toggleButton}
-        focusTextarea={focusTextarea}
-      />
+        <ChatInput
+          inputValue={inputValue}
+          setInputValue={setInputValue}
+          hasTyped={hasTyped}
+          setHasTyped={setHasTyped}
+          activeButton={activeButton}
+          setActiveButton={setActiveButton}
+          isStreaming={isStreaming}
+          isConnected={chatState.isConnected}
+          isMobile={isMobile}
+          textareaRef={textareaRef}
+          inputContainerRef={inputContainerRef}
+          handleInputChange={handleInputChange}
+          handleSubmit={handleSubmit}
+          handleKeyDown={handleKeyDown}
+          handleInputContainerClick={handleInputContainerClick}
+          toggleButton={toggleButton}
+          focusTextarea={focusTextarea}
+        />
+      </div>
     </div>
   );
 } 

@@ -2,19 +2,7 @@ import { RefreshCcw, Copy, Share2, ThumbsUp, ThumbsDown, Bot, User } from "lucid
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import MessageTabs from './MessageTabs';
-
-type MessageType = "user" | "system";
-
-interface Message {
-  id: string;
-  content: string;
-  type: MessageType;
-  completed?: boolean;
-  newSection?: boolean;
-  role?: 'user' | 'assistant';
-  timestamp?: Date;
-  toolCalls?: any[];
-}
+import { Message } from '@/lib/chat-storage';
 
 interface StreamingWord {
   id: number;
