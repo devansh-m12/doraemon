@@ -344,3 +344,56 @@
 .animation-delay-500 {
   animation-delay: 0.5s;
 }
+
+/* Mermaid diagram styles */
+.mermaid-diagram {
+  /* Ensure diagrams are responsive */
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.mermaid-diagram svg {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}
+
+/* Mermaid theme integration */
+.mermaid {
+  /* Ensure text is readable */
+  font-family: inherit;
+  background: transparent;
+}
+
+/* Dark mode adjustments for mermaid */
+.dark .mermaid text {
+  fill: var(--foreground) !important;
+}
+
+.dark .mermaid .node rect,
+.dark .mermaid .node circle,
+.dark .mermaid .node ellipse,
+.dark .mermaid .node polygon {
+  stroke: var(--border) !important;
+}
+
+.dark .mermaid .edgePath path {
+  stroke: var(--border) !important;
+}
+
+/* Light mode adjustments for mermaid */
+.mermaid text {
+  fill: var(--foreground);
+}
+
+.mermaid .node rect,
+.mermaid .node circle, 
+.mermaid .node ellipse,
+.mermaid .node polygon {
+  stroke: var(--border);
+}
+
+.mermaid .edgePath path {
+  stroke: var(--border);
+}

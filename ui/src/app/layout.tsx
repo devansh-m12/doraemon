@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ui/theme-provider";
+import MermaidProvider from "@/components/MermaidProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,6 +29,9 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        {/* Load Mermaid globally for the entire application */}
+        <MermaidProvider />
+        
         <ThemeProvider
           defaultTheme="light"
           storageKey="ui-theme"
