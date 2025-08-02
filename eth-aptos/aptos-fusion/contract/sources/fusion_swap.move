@@ -136,6 +136,11 @@ module fusion_swap_addr::fusion_swap {
         table::add(&mut store.orders, order_id, order_config);
         store.size = store.size + 1;
         
+        // Add to indexes
+        add_order_to_maker_index(store, maker, order_id);
+        add_order_to_status_index(store, ORDER_STATUS_ACTIVE, order_id);
+        add_order_to_active_index(store, order_id);
+        
         // Clear reentrancy guard
         clear_reentrancy_guard();
     }
@@ -152,7 +157,14 @@ module fusion_swap_addr::fusion_swap {
         assert!(order.maker == sender_addr, ENOT_AUTHORIZED);
         assert!(order.status.state == ORDER_STATUS_ACTIVE || order.status.state == ORDER_STATUS_PARTIALLY_FILLED, EORDER_EXPIRED);
         
+        let old_status = order.status.state;
         update_order_status(order, ORDER_STATUS_CANCELLED);
+        
+        // Update indexes
+        remove_order_from_status_index(store, old_status, order_id);
+        remove_order_from_active_index(store, order_id);
+        add_order_to_status_index(store, ORDER_STATUS_CANCELLED, order_id);
+        
         let global = borrow_global_mut<FusionSwapGlobal>(@fusion_swap_addr);
         global.total_orders = global.total_orders - 1;
         clear_reentrancy_guard();
@@ -199,12 +211,20 @@ module fusion_swap_addr::fusion_swap {
         order.updated_at = 0; // TODO: Use actual timestamp
         
         // Check if order is completely filled and update status
+        let old_status = order.status.state;
         if (order.remaining_amount == 0) {
             update_order_status(order, ORDER_STATUS_FILLED);
+            // Update indexes for complete fill
+            remove_order_from_status_index(store, old_status, order_id);
+            remove_order_from_active_index(store, order_id);
+            add_order_to_status_index(store, ORDER_STATUS_FILLED, order_id);
         } else {
             // Only update to PARTIALLY_FILLED if not already in that state
             if (order.status.state != ORDER_STATUS_PARTIALLY_FILLED) {
                 update_order_status(order, ORDER_STATUS_PARTIALLY_FILLED);
+                // Update indexes for partial fill
+                remove_order_from_status_index(store, old_status, order_id);
+                add_order_to_status_index(store, ORDER_STATUS_PARTIALLY_FILLED, order_id);
             }
         };
         
@@ -330,25 +350,94 @@ module fusion_swap_addr::fusion_swap {
         *table::borrow(&store.orders, order_id)
     }
 
-    fun get_orders_by_maker(maker: address): vector<u64> {
-        // For now, return empty vector - would need to implement with proper indexing
-        vector::empty<u64>()
+    fun get_orders_by_maker(maker: address): vector<u64> acquires OrderStore {
+        let store = borrow_global<OrderStore>(@fusion_swap_addr);
+        if (table::contains(&store.orders_by_maker, maker)) {
+            *table::borrow(&store.orders_by_maker, maker)
+        } else {
+            vector::empty<u64>()
+        }
     }
 
-    fun get_orders_by_status(status: u8): vector<u64> {
-        // For now, return empty vector - would need to implement with proper indexing
-        vector::empty<u64>()
+    fun get_orders_by_status(status: u8): vector<u64> acquires OrderStore {
+        let store = borrow_global<OrderStore>(@fusion_swap_addr);
+        if (table::contains(&store.orders_by_status, status)) {
+            *table::borrow(&store.orders_by_status, status)
+        } else {
+            vector::empty<u64>()
+        }
     }
 
-    fun calculate_order_statistics(): (u64, u64, u64, u64, u64) {
-        // For now, return zeros - would need to implement with proper indexing
-        (0, 0, 0, 0, 0)
+    fun calculate_order_statistics(): (u64, u64, u64, u64, u64) acquires OrderStore {
+        let store = borrow_global<OrderStore>(@fusion_swap_addr);
+        let active_count = vector::length(&store.active_orders);
+        let filled_count = if (table::contains(&store.orders_by_status, ORDER_STATUS_FILLED)) {
+            vector::length(table::borrow(&store.orders_by_status, ORDER_STATUS_FILLED))
+        } else { 0 };
+        let cancelled_count = if (table::contains(&store.orders_by_status, ORDER_STATUS_CANCELLED)) {
+            vector::length(table::borrow(&store.orders_by_status, ORDER_STATUS_CANCELLED))
+        } else { 0 };
+        let expired_count = if (table::contains(&store.orders_by_status, ORDER_STATUS_EXPIRED)) {
+            vector::length(table::borrow(&store.orders_by_status, ORDER_STATUS_EXPIRED))
+        } else { 0 };
+        let partially_filled_count = if (table::contains(&store.orders_by_status, ORDER_STATUS_PARTIALLY_FILLED)) {
+            vector::length(table::borrow(&store.orders_by_status, ORDER_STATUS_PARTIALLY_FILLED))
+        } else { 0 };
+        (active_count, filled_count, cancelled_count, expired_count, partially_filled_count)
     }
 
     fun get_order_history(order_id: u64): (u64, u64, u128, u128) acquires OrderStore {
         let store = borrow_global<OrderStore>(@fusion_swap_addr);
         let order = table::borrow(&store.orders, order_id);
         (order.created_at, order.updated_at, order.filled_amount, order.remaining_amount)
+    }
+
+    // Index management functions
+    fun add_order_to_maker_index(store: &mut OrderStore, maker: address, order_id: u64) {
+        if (!table::contains(&store.orders_by_maker, maker)) {
+            table::add(&mut store.orders_by_maker, maker, vector::empty<u64>());
+        };
+        let maker_orders = table::borrow_mut(&mut store.orders_by_maker, maker);
+        vector::push_back(maker_orders, order_id);
+    }
+
+    fun add_order_to_status_index(store: &mut OrderStore, status: u8, order_id: u64) {
+        if (!table::contains(&store.orders_by_status, status)) {
+            table::add(&mut store.orders_by_status, status, vector::empty<u64>());
+        };
+        let status_orders = table::borrow_mut(&mut store.orders_by_status, status);
+        vector::push_back(status_orders, order_id);
+    }
+
+    fun add_order_to_active_index(store: &mut OrderStore, order_id: u64) {
+        vector::push_back(&mut store.active_orders, order_id);
+    }
+
+    fun remove_order_from_status_index(store: &mut OrderStore, old_status: u8, order_id: u64) {
+        if (table::contains(&store.orders_by_status, old_status)) {
+            let status_orders = table::borrow_mut(&mut store.orders_by_status, old_status);
+            let len = vector::length(status_orders);
+            let i = 0;
+            while (i < len) {
+                if (*vector::borrow(status_orders, i) == order_id) {
+                    vector::remove(status_orders, i);
+                    break;
+                };
+                i = i + 1;
+            };
+        };
+    }
+
+    fun remove_order_from_active_index(store: &mut OrderStore, order_id: u64) {
+        let len = vector::length(&store.active_orders);
+        let i = 0;
+        while (i < len) {
+            if (*vector::borrow(&store.active_orders, i) == order_id) {
+                vector::remove(&mut store.active_orders, i);
+                break;
+            };
+            i = i + 1;
+        };
     }
 
     // Batch Operations Functions
@@ -507,24 +596,53 @@ module fusion_swap_addr::fusion_swap {
     }
 
     // Advanced Query & Filtering Functions
-    fun get_orders_by_maker_advanced(maker: address): vector<u64> {
-        // For now, return empty vector - would need to implement with proper indexing
-        vector::empty<u64>()
+    fun get_orders_by_maker_advanced(maker: address): vector<u64> acquires OrderStore {
+        get_orders_by_maker(maker)
     }
 
-    fun get_active_orders(): vector<u64> {
-        // For now, return empty vector - would need to implement with proper indexing
-        vector::empty<u64>()
+    fun get_active_orders(): vector<u64> acquires OrderStore {
+        let store = borrow_global<OrderStore>(@fusion_swap_addr);
+        store.active_orders
     }
 
-    fun get_orders_by_price_range(min_price: u128, max_price: u128): vector<u64> {
-        // For now, return empty vector - would need to implement with proper indexing
-        vector::empty<u64>()
+    fun get_orders_by_price_range(min_price: u128, max_price: u128): vector<u64> acquires OrderStore {
+        // For now, return active orders that might be in the price range
+        // This is a simplified implementation - in production you'd want more sophisticated indexing
+        let store = borrow_global<OrderStore>(@fusion_swap_addr);
+        let active_orders = store.active_orders;
+        let filtered_orders = vector::empty<u64>();
+        let len = vector::length(&active_orders);
+        let i = 0;
+        while (i < len) {
+            let order_id = *vector::borrow(&active_orders, i);
+            let order = table::borrow(&store.orders, order_id);
+            let estimated_price = order.estimated_dst_amount;
+            if (estimated_price >= min_price && estimated_price <= max_price) {
+                vector::push_back(&mut filtered_orders, order_id);
+            };
+            i = i + 1;
+        };
+        filtered_orders
     }
 
-    fun get_orders_by_time_range(start_time: u64, end_time: u64): vector<u64> {
-        // For now, return empty vector - would need to implement with proper indexing
-        vector::empty<u64>()
+    fun get_orders_by_time_range(start_time: u64, end_time: u64): vector<u64> acquires OrderStore {
+        // For now, return active orders that might be in the time range
+        // This is a simplified implementation - in production you'd want more sophisticated indexing
+        let store = borrow_global<OrderStore>(@fusion_swap_addr);
+        let active_orders = store.active_orders;
+        let filtered_orders = vector::empty<u64>();
+        let len = vector::length(&active_orders);
+        let i = 0;
+        while (i < len) {
+            let order_id = *vector::borrow(&active_orders, i);
+            let order = table::borrow(&store.orders, order_id);
+            let created_at = order.created_at;
+            if (created_at >= start_time && created_at <= end_time) {
+                vector::push_back(&mut filtered_orders, order_id);
+            };
+            i = i + 1;
+        };
+        filtered_orders
     }
 
     fun sort_orders_by_creation_time(order_ids: vector<u64>): vector<u64> {
@@ -555,14 +673,49 @@ module fusion_swap_addr::fusion_swap {
         filtered_orders
     }
 
-    fun get_order_statistics_by_maker(maker: address): (u64, u64, u64, u64, u64) {
-        // For now, return zeros - would need to implement with proper indexing
-        (0, 0, 0, 0, 0)
+    fun get_order_statistics_by_maker(maker: address): (u64, u64, u64, u64, u64) acquires OrderStore {
+        let maker_orders = get_orders_by_maker(maker);
+        let store = borrow_global<OrderStore>(@fusion_swap_addr);
+        let active_count = 0;
+        let filled_count = 0;
+        let cancelled_count = 0;
+        let expired_count = 0;
+        let partially_filled_count = 0;
+        let len = vector::length(&maker_orders);
+        let i = 0;
+        while (i < len) {
+            let order_id = *vector::borrow(&maker_orders, i);
+            let order = table::borrow(&store.orders, order_id);
+            let status = order.status.state;
+            if (status == ORDER_STATUS_ACTIVE) {
+                active_count = active_count + 1;
+            } else if (status == ORDER_STATUS_FILLED) {
+                filled_count = filled_count + 1;
+            } else if (status == ORDER_STATUS_CANCELLED) {
+                cancelled_count = cancelled_count + 1;
+            } else if (status == ORDER_STATUS_EXPIRED) {
+                expired_count = expired_count + 1;
+            } else if (status == ORDER_STATUS_PARTIALLY_FILLED) {
+                partially_filled_count = partially_filled_count + 1;
+            };
+            i = i + 1;
+        };
+        (active_count, filled_count, cancelled_count, expired_count, partially_filled_count)
     }
 
-    fun get_order_volume_by_time_range(start_time: u64, end_time: u64): u128 {
-        // For now, return zero - would need to implement with proper indexing
-        0
+    fun get_order_volume_by_time_range(start_time: u64, end_time: u64): u128 acquires OrderStore {
+        let orders_in_range = get_orders_by_time_range(start_time, end_time);
+        let store = borrow_global<OrderStore>(@fusion_swap_addr);
+        let total_volume = 0;
+        let len = vector::length(&orders_in_range);
+        let i = 0;
+        while (i < len) {
+            let order_id = *vector::borrow(&orders_in_range, i);
+            let order = table::borrow(&store.orders, order_id);
+            total_volume = total_volume + order.filled_amount;
+            i = i + 1;
+        };
+        total_volume
     }
 
     // Performance Optimization Functions
@@ -855,17 +1008,17 @@ module fusion_swap_addr::fusion_swap {
     }
 
     #[test_only]
-    public fun test_get_orders_by_maker(maker: address): vector<u64> {
+    public fun test_get_orders_by_maker(maker: address): vector<u64> acquires OrderStore {
         get_orders_by_maker(maker)
     }
 
     #[test_only]
-    public fun test_get_orders_by_status(status: u8): vector<u64> {
+    public fun test_get_orders_by_status(status: u8): vector<u64> acquires OrderStore {
         get_orders_by_status(status)
     }
 
     #[test_only]
-    public fun test_calculate_order_statistics(): (u64, u64, u64, u64, u64) {
+    public fun test_calculate_order_statistics(): (u64, u64, u64, u64, u64) acquires OrderStore {
         calculate_order_statistics()
     }
 
@@ -961,22 +1114,22 @@ module fusion_swap_addr::fusion_swap {
     }
 
     #[test_only]
-    public fun test_get_orders_by_maker_advanced(maker: address): vector<u64> {
+    public fun test_get_orders_by_maker_advanced(maker: address): vector<u64> acquires OrderStore {
         get_orders_by_maker_advanced(maker)
     }
 
     #[test_only]
-    public fun test_get_active_orders(): vector<u64> {
+    public fun test_get_active_orders(): vector<u64> acquires OrderStore {
         get_active_orders()
     }
 
     #[test_only]
-    public fun test_get_orders_by_price_range(min_price: u128, max_price: u128): vector<u64> {
+    public fun test_get_orders_by_price_range(min_price: u128, max_price: u128): vector<u64> acquires OrderStore {
         get_orders_by_price_range(min_price, max_price)
     }
 
     #[test_only]
-    public fun test_get_orders_by_time_range(start_time: u64, end_time: u64): vector<u64> {
+    public fun test_get_orders_by_time_range(start_time: u64, end_time: u64): vector<u64> acquires OrderStore {
         get_orders_by_time_range(start_time, end_time)
     }
 
@@ -996,12 +1149,12 @@ module fusion_swap_addr::fusion_swap {
     }
 
     #[test_only]
-    public fun test_get_order_statistics_by_maker(maker: address): (u64, u64, u64, u64, u64) {
+    public fun test_get_order_statistics_by_maker(maker: address): (u64, u64, u64, u64, u64) acquires OrderStore {
         get_order_statistics_by_maker(maker)
     }
 
     #[test_only]
-    public fun test_get_order_volume_by_time_range(start_time: u64, end_time: u64): u128 {
+    public fun test_get_order_volume_by_time_range(start_time: u64, end_time: u64): u128 acquires OrderStore {
         get_order_volume_by_time_range(start_time, end_time)
     }
 
@@ -1246,11 +1399,22 @@ module fusion_swap_addr::fusion_swap {
     struct OrderStore has key {
         orders: table::Table<u64, OrderConfig>,
         size: u64,
+        // Indexes for efficient queries
+        orders_by_maker: table::Table<address, vector<u64>>,
+        orders_by_status: table::Table<u8, vector<u64>>,
+        active_orders: vector<u64>,
+    }
+
+    struct IndexStore has key {
+        // Additional indexes for advanced queries
+        orders_by_price_range: table::Table<u128, vector<u64>>, // Price -> Order IDs
+        orders_by_time_range: table::Table<u64, vector<u64>>,   // Time -> Order IDs
     }
 
     fun init_module(sender: &signer) {
         move_to(sender, FusionSwapGlobal { next_order_id: 1, total_orders: 0, total_volume: 0, total_fees: 0, reentrancy_guard: false });
-        move_to(sender, OrderStore { orders: table::new(), size: 0 });
+        move_to(sender, OrderStore { orders: table::new(), size: 0, orders_by_maker: table::new(), orders_by_status: table::new(), active_orders: vector::empty<u64>() });
+        move_to(sender, IndexStore { orders_by_price_range: table::new(), orders_by_time_range: table::new() });
     }
 
     #[test_only]

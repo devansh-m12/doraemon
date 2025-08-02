@@ -1109,16 +1109,16 @@ module fusion_swap_addr::fusion_swap_tests {
         
         // Test get_orders_by_maker
         let maker_orders = fusion_swap::test_get_orders_by_maker(addr);
-        assert!(vector::length(&maker_orders) == 0, 0); // Simplified implementation returns empty
+        assert!(vector::length(&maker_orders) == 2, 0); // Now returns real data with 2 orders
         
         // Test get_orders_by_status
         let active_orders = fusion_swap::test_get_orders_by_status(0); // ACTIVE
-        assert!(vector::length(&active_orders) == 0, 0); // Simplified implementation returns empty
+        assert!(vector::length(&active_orders) == 2, 0); // Now returns real data with 2 active orders
         
         // Cancel one order
         fusion_swap::cancel_order(&account, 1);
         let cancelled_orders = fusion_swap::test_get_orders_by_status(3); // CANCELLED
-        assert!(vector::length(&cancelled_orders) == 0, 0); // Simplified implementation returns empty
+        assert!(vector::length(&cancelled_orders) == 1, 0); // Now returns real data with 1 cancelled order
         
         // Test get_order_history
         let (created_at, updated_at, filled_amount, remaining_amount) = fusion_swap::test_get_order_history(1);
@@ -1151,7 +1151,7 @@ module fusion_swap_addr::fusion_swap_tests {
         
         // Test initial statistics
         let (active, filled, cancelled, expired, partially_filled) = fusion_swap::test_calculate_order_statistics();
-        assert!(active == 0, 0); // Simplified implementation returns zeros
+        assert!(active == 3, 0); // Now returns real data with 3 active orders
         assert!(filled == 0, 0);
         assert!(cancelled == 0, 0);
         assert!(expired == 0, 0);
@@ -1162,9 +1162,9 @@ module fusion_swap_addr::fusion_swap_tests {
         
         // Test statistics after cancellation
         let (active, filled, cancelled, expired, partially_filled) = fusion_swap::test_calculate_order_statistics();
-        assert!(active == 0, 0); // Simplified implementation returns zeros
+        assert!(active == 2, 0); // Now returns real data with 2 active orders
         assert!(filled == 0, 0);
-        assert!(cancelled == 0, 0);
+        assert!(cancelled == 1, 0); // Now returns real data with 1 cancelled order
         assert!(expired == 0, 0);
         assert!(partially_filled == 0, 0);
         
@@ -1180,9 +1180,9 @@ module fusion_swap_addr::fusion_swap_tests {
         
         // Test statistics after fill
         let (active, filled, cancelled, expired, partially_filled) = fusion_swap::test_calculate_order_statistics();
-        assert!(active == 0, 0); // Simplified implementation returns zeros
-        assert!(filled == 0, 0);
-        assert!(cancelled == 0, 0);
+        assert!(active == 1, 0); // Now returns real data with 1 active order (after cancelling 1 and filling 1 completely)
+        assert!(filled == 1, 0); // Now returns real data with 1 filled order
+        assert!(cancelled == 1, 0); // Now returns real data with 1 cancelled order
         assert!(expired == 0, 0);
         assert!(partially_filled == 0, 0);
         
@@ -1198,11 +1198,11 @@ module fusion_swap_addr::fusion_swap_tests {
         
         // Test final statistics
         let (active, filled, cancelled, expired, partially_filled) = fusion_swap::test_calculate_order_statistics();
-        assert!(active == 0, 0); // Simplified implementation returns zeros
-        assert!(filled == 0, 0);
-        assert!(cancelled == 0, 0);
+        assert!(active == 1, 0); // Now returns real data with 1 active order (the partially filled order)
+        assert!(filled == 1, 0); // Now returns real data with 1 filled order
+        assert!(cancelled == 1, 0); // Now returns real data with 1 cancelled order
         assert!(expired == 0, 0);
-        assert!(partially_filled == 0, 0);
+        assert!(partially_filled == 1, 0); // Now returns real data with 1 partially filled order
     }
 
     #[test(account = @fusion_swap_addr)]
@@ -1475,11 +1475,11 @@ module fusion_swap_addr::fusion_swap_tests {
         
         // Test advanced maker query
         let maker_orders = fusion_swap::test_get_orders_by_maker_advanced(addr);
-        assert!(vector::length(&maker_orders) == 0, 0); // Simplified implementation returns empty
+        assert!(vector::length(&maker_orders) == 3, 0); // Now returns real data with 3 orders
         
         // Test maker statistics
         let (active, filled, cancelled, expired, partially_filled) = fusion_swap::test_get_order_statistics_by_maker(addr);
-        assert!(active == 0, 0); // Simplified implementation returns zeros
+        assert!(active == 3, 0); // Now returns real data with 3 active orders
         assert!(filled == 0, 0);
         assert!(cancelled == 0, 0);
         assert!(expired == 0, 0);
@@ -1512,15 +1512,15 @@ module fusion_swap_addr::fusion_swap_tests {
         
         // Test active orders query
         let active_orders = fusion_swap::test_get_active_orders();
-        assert!(vector::length(&active_orders) == 0, 0); // Simplified implementation returns empty
+        assert!(vector::length(&active_orders) == 1, 0); // Now returns real data with 1 active order (after cancelling 1)
         
         // Test price range query
         let price_range_orders = fusion_swap::test_get_orders_by_price_range(400, 600);
-        assert!(vector::length(&price_range_orders) == 0, 0); // Simplified implementation returns empty
+        assert!(vector::length(&price_range_orders) == 1, 0); // Now returns real data with 1 order in price range
         
         // Test time range query
         let time_range_orders = fusion_swap::test_get_orders_by_time_range(0, 1000);
-        assert!(vector::length(&time_range_orders) == 0, 0); // Simplified implementation returns empty
+        assert!(vector::length(&time_range_orders) == 1, 0); // Now returns real data with 1 order in time range
     }
 
     #[test(account = @fusion_swap_addr)]
