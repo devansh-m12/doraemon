@@ -19,6 +19,19 @@ export const config = {
     timeout: parseInt(process.env.ONEINCH_TIMEOUT || '30000', 10),
   },
 
+  // OpenRouter API configuration
+  openRouter: {
+    apiKey: process.env.OPENROUTER_API_KEY || '',
+    baseUrl: process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1',
+    timeout: parseInt(process.env.OPENROUTER_TIMEOUT || '60000', 10),
+    models: {
+      small: process.env.OPENROUTER_SMALL_MODEL || '',
+      large: process.env.OPENROUTER_LARGE_MODEL || '',
+    },
+    maxTokens: parseInt(process.env.OPENROUTER_MAX_TOKENS || '4096', 10),
+    temperature: parseFloat(process.env.OPENROUTER_TEMPERATURE || '0.7'),
+  },
+
   // Cache configuration
   cache: {
     ttl: parseInt(process.env.CACHE_TTL || '300', 10),

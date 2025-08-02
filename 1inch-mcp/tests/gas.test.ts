@@ -1,5 +1,6 @@
 import { GasService } from '../src/services/gas/GasService';
 import { config } from '../src/config/index';
+import { describe, it, beforeEach, expect, jest, beforeAll } from '@jest/globals';
 
 describe('GasService', () => {
   let gasService: GasService;

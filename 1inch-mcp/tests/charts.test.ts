@@ -1,5 +1,7 @@
 import { ChartsService } from '../src/services/charts/ChartsService';
 import { config } from '../src/config/index';
+import { describe, it, beforeEach, expect, jest, beforeAll } from '@jest/globals';
+
 
 describe('ChartsService', () => {
   let chartsService: ChartsService;

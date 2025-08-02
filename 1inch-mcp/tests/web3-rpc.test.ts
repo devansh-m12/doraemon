@@ -1,5 +1,6 @@
 import { Web3RpcService } from '../src/services/web3-rpc/Web3RpcService';
 import { config } from '../src/config/index';
+import { describe, it, beforeEach, expect, jest, beforeAll } from '@jest/globals';
 
 describe('Web3RpcService', () => {
   let web3RpcService: Web3RpcService;

@@ -1,6 +1,7 @@
 import { DomainService } from '../src/services/domain/DomainService';
 import { config } from '../src/config/index';
 import { BatchDomainResult } from '../src/services/domain/DomainTypes';
+import { describe, it, beforeEach, expect, jest, beforeAll } from '@jest/globals';
 
 describe('DomainService', () => {
   let domainService: DomainService;

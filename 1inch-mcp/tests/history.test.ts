@@ -1,5 +1,6 @@
 import { HistoryService } from '../src/services/history/HistoryService';
 import { config } from '../src/config/index';
+import { describe, it, beforeEach, expect, jest, beforeAll } from '@jest/globals';
 
 describe('HistoryService', () => {
   let historyService: HistoryService;

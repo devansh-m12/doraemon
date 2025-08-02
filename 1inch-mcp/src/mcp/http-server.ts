@@ -1,15 +1,7 @@
 #!/usr/bin/env node
 
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { HttpServerTransport } from '@modelcontextprotocol/sdk/server/http.js';
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-  ListResourcesRequestSchema,
-  ReadResourceRequestSchema,
-  GetPromptRequestSchema,
-  ListPromptsRequestSchema,
-} from '@modelcontextprotocol/sdk/types.js';
+import express from 'express';
+import cors from 'cors';
 import { ServiceOrchestrator } from '../services/ServiceOrchestrator';
 import { logger } from '../config/logger';
 
@@ -21,122 +13,117 @@ import { logger } from '../config/logger';
  */
 
 export class OneInchMCPHTTPServer {
-  private server: Server;
+  private app: express.Application;
   private orchestrator: ServiceOrchestrator;
   private port: number;
 
   constructor(port: number = 6969) {
     this.port = port;
-    this.server = new Server(
-      {
-        name: '1inch-mcp-http-server',
-        version: '1.0.0',
-      },
-      {
-        capabilities: {
-          tools: {},
-          resources: {},
-          prompts: {},
-        },
-      }
-    );
-
+    this.app = express();
     this.orchestrator = new ServiceOrchestrator();
-    this.setupToolHandlers();
-    this.setupResourceHandlers();
-    this.setupPromptHandlers();
+    
+    this.setupMiddleware();
+    this.setupRoutes();
   }
 
-  private setupToolHandlers() {
+  private setupMiddleware() {
+    this.app.use(cors({
+      origin: '*',
+      methods: ['GET', 'POST', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization']
+    }));
+    this.app.use(express.json());
+  }
+
+  private setupRoutes() {
+    // Health check
+    this.app.get('/health', (req, res) => {
+      res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    });
+
     // List available tools
-    this.server.setRequestHandler(ListToolsRequestSchema, async () => {
-      return {
-        tools: this.orchestrator.getAllTools()
-      };
+    this.app.get('/tools', async (req, res) => {
+      try {
+        const tools = this.orchestrator.getAllTools();
+        res.json({ tools });
+      } catch (error) {
+        logger.error('Error listing tools:', error);
+        res.status(500).json({ error: 'Internal server error' });
+      }
     });
 
     // Handle tool calls
-    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
-      const { name, arguments: args } = request.params;
+    this.app.post('/tools/:name', async (req, res) => {
+      const { name } = req.params;
+      const args = req.body;
 
       try {
         const result = await this.orchestrator.handleToolCall(name, args);
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(result, null, 2)
-            }
-          ]
-        };
+        res.json(result);
       } catch (error) {
         logger.error(`Error handling tool ${name}:`, error);
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
-            }
-          ]
-        };
+        res.status(500).json({ 
+          error: error instanceof Error ? error.message : 'Unknown error' 
+        });
       }
     });
-  }
 
-  private setupResourceHandlers() {
     // List available resources
-    this.server.setRequestHandler(ListResourcesRequestSchema, async () => {
-      return {
-        resources: this.orchestrator.getAllResources()
-      };
+    this.app.get('/resources', async (req, res) => {
+      try {
+        const resources = this.orchestrator.getAllResources();
+        res.json({ resources });
+      } catch (error) {
+        logger.error('Error listing resources:', error);
+        res.status(500).json({ error: 'Internal server error' });
+      }
     });
 
     // Handle resource reads
-    this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
-      const { uri } = request.params;
+    this.app.get('/resources/read', async (req, res) => {
+      const { uri } = req.query;
 
       try {
-        return await this.orchestrator.handleResourceRead(uri);
+        const result = await this.orchestrator.handleResourceRead(uri as string);
+        res.json(result);
       } catch (error) {
         logger.error(`Error handling resource ${uri}:`, error);
-        throw new Error(`Unknown resource: ${uri}`);
+        res.status(404).json({ error: `Unknown resource: ${uri}` });
       }
     });
-  }
 
-  private setupPromptHandlers() {
     // List available prompts
-    this.server.setRequestHandler(ListPromptsRequestSchema, async () => {
-      return {
-        prompts: this.orchestrator.getAllPrompts()
-      };
+    this.app.get('/prompts', async (req, res) => {
+      try {
+        const prompts = this.orchestrator.getAllPrompts();
+        res.json({ prompts });
+      } catch (error) {
+        logger.error('Error listing prompts:', error);
+        res.status(500).json({ error: 'Internal server error' });
+      }
     });
 
     // Handle prompt requests
-    this.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
-      const { name, arguments: args } = request.params;
+    this.app.post('/prompts/:name', async (req, res) => {
+      const { name } = req.params;
+      const args = req.body;
 
       try {
-        return await this.orchestrator.handlePromptRequest(name, args);
+        const result = await this.orchestrator.handlePromptRequest(name, args);
+        res.json(result);
       } catch (error) {
         logger.error(`Error handling prompt ${name}:`, error);
-        throw new Error(`Unknown prompt: ${name}`);
+        res.status(500).json({ 
+          error: error instanceof Error ? error.message : 'Unknown error' 
+        });
       }
     });
   }
 
   async run() {
-    const transport = new HttpServerTransport({
-      port: this.port,
-      cors: {
-        origin: '*', // Allow all origins for development
-        methods: ['GET', 'POST', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'Authorization']
-      }
+    this.app.listen(this.port, () => {
+      logger.info(`1inch MCP HTTP Server running on port ${this.port}`);
+      logger.info(`Server URL: http://localhost:${this.port}`);
     });
-    
-    await this.server.connect(transport);
-    logger.info(`1inch MCP HTTP Server running on port ${this.port}`);
-    logger.info(`Server URL: http://localhost:${this.port}`);
   }
 } 

@@ -1,6 +1,8 @@
 import { FusionPlusSwapService } from '../src/services/fusion-plus-swap/FusionPlusSwapService';
 import { ethers } from 'ethers';
 
+import { describe, it, beforeEach, expect, jest, beforeAll } from '@jest/globals';
+
 describe('FusionPlusSwapService', () => {
   let service: FusionPlusSwapService;
   let testWallet: ethers.HDNodeWallet;

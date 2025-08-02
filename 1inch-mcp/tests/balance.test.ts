@@ -1,5 +1,6 @@
 import { BalanceService } from '../src/services/balance/BalanceService';
 import { config } from '../src/config/index';
+import { describe, it, beforeEach, expect, jest, beforeAll } from '@jest/globals';
 
 describe('BalanceService', () => {
   let balanceService: BalanceService;

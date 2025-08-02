@@ -1,4 +1,4 @@
-import { OneInchFetcher } from "../../utils/fetcher";
+// Removed unused import - OneInchFetcher not used in this file
 
 // Basic types for Fusion+ API
 export interface Meta {

@@ -1,5 +1,6 @@
 import { TokenDetailsService } from '../src/services/token-details/TokenDetailsService';
 import { config } from '../src/config/index';
+import { describe, it, beforeEach, expect, jest, beforeAll } from '@jest/globals';
 
 describe('TokenDetailsService', () => {
   let tokenDetailsService: TokenDetailsService;

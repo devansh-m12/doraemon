@@ -13,6 +13,18 @@ const configSchema = Joi.object({
     timeout: Joi.number().positive().default(30000),
   }).required(),
 
+  openRouter: Joi.object({
+    apiKey: Joi.string().allow('').default(''),
+    baseUrl: Joi.string().uri().default('https://openrouter.ai/api/v1'),
+    timeout: Joi.number().positive().default(60000),
+    models: Joi.object({
+      small: Joi.string().allow('').default(''),
+      large: Joi.string().allow('').default(''),
+    }).required(),
+    maxTokens: Joi.number().positive().default(4096),
+    temperature: Joi.number().min(0).max(2).default(0.7),
+  }).required(),
+
   cache: Joi.object({
     ttl: Joi.number().positive().default(300),
     redisUrl: Joi.string().uri().optional(),

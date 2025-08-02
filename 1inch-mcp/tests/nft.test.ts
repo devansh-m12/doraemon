@@ -1,5 +1,6 @@
 import { NFTService } from '../src/services/nft/NFTService';
 import { ServiceConfig } from '../src/services/base/BaseService';
+import { describe, it, beforeEach, expect, jest } from '@jest/globals';
 
 describe('NFTService', () => {
   let nftService: NFTService;

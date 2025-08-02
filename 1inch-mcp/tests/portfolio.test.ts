@@ -1,5 +1,6 @@
 import { PortfolioService } from '../src/services/portfolio/PortfolioService';
 import { config } from '../src/config/index';
+import { describe, it, beforeEach, expect, jest, beforeAll } from '@jest/globals';
 
 describe('PortfolioService', () => {
   let portfolioService: PortfolioService;

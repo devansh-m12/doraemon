@@ -1,5 +1,6 @@
 import { SpotPriceService } from '../src/services/spot-price/SpotPriceService';
 import { config } from '../src/config/index';
+import { describe, it, beforeEach, expect, jest, beforeAll } from '@jest/globals';
 
 describe('SpotPriceService', () => {
   let spotPriceService: SpotPriceService;

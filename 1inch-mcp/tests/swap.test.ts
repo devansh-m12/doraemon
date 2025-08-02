@@ -1,5 +1,6 @@
 import { SwapService } from '../src/services/swap/SwapService';
 import { config } from '../src/config/index';
+import { describe, it, beforeEach, expect, jest, beforeAll } from '@jest/globals';
 
 describe('SwapService', () => {
   let swapService: SwapService;

@@ -1,5 +1,6 @@
 import { TracesService } from '../src/services/traces/TracesService';
 import { config } from '../src/config/index';
+import { describe, it, beforeEach, expect, jest, beforeAll } from '@jest/globals';
 
 describe('TracesService', () => {
   let tracesService: TracesService;

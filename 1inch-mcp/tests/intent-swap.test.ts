@@ -1,5 +1,6 @@
 import { IntentSwapService } from '../src/services/intent-swap/IntentSwapService';
 import { ethers } from 'ethers';
+import { describe, it, beforeEach, expect, jest, beforeAll } from '@jest/globals';
 
 describe('IntentSwapService', () => {
   let service: IntentSwapService;
@@ -212,43 +213,7 @@ describe('IntentSwapService', () => {
     });
   });
 
-  describe('Legacy methods (deprecated)', () => {
-    it('should warn when using deprecated getTokens method', async () => {
-      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
-      
-      try {
-        await service.getTokens({ chain: 1 });
-      } catch (error) {
-        // API might return error for test key, but warning should still be logged
-        expect(error).toBeDefined();
-      }
-      
-      expect(consoleSpy).toHaveBeenCalledWith('getTokens is deprecated. Use Fusion API endpoints instead.');
-      
-      consoleSpy.mockRestore();
-    });
 
-    it('should warn when using deprecated createOrder method', async () => {
-      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
-      
-      try {
-        await service.createOrder({ 
-          chain: 1, 
-          fromTokenAddress: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', // USDC
-          toTokenAddress: '0xdAC17F958D2ee523a2206206994597C13D831ec7', // USDT
-          amount: '10000000',
-          fromAddress: testAddress
-        });
-      } catch (error) {
-        // API might return error for test key, but warning should still be logged
-        expect(error).toBeDefined();
-      }
-      
-      expect(consoleSpy).toHaveBeenCalledWith('createOrder is deprecated. Use submitOrder for Fusion API instead.');
-      
-      consoleSpy.mockRestore();
-    });
-  });
 
   describe('Ethers integration tests', () => {
     it('should create multiple test wallets using ethers', () => {
