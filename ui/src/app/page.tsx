@@ -70,7 +70,7 @@ export default function Home() {
     setInputMessage('');
 
     try {
-      const response = await mcpClient.callTool({
+      const response : any = await mcpClient.callTool({
         name: 'intelligent_chat',
         arguments: {
           conversationId: chatState.conversationId,
@@ -78,12 +78,14 @@ export default function Home() {
         }
       });
 
-      const assistantMessage: Message = {
+      console.log("response", response);
+
+      const assistantMessage: any = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: response.content[0]?.text || 'No response received',
+        content: response?.data.response || 'No response received',
         timestamp: new Date(),
-        toolCalls: response.content[0]?.toolCalls
+        toolCalls: response?.data.functionCalls
       };
 
       setChatState(prev => ({

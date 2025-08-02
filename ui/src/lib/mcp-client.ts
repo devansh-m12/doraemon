@@ -10,10 +10,19 @@ export interface MCPToolCall {
 }
 
 export interface MCPResponse {
-  content: Array<{
-    type: string;
-    text: string;
-  }>;
+  result: {
+    success: boolean;
+    data: {
+      response: string;
+      conversationId: string;
+      functionCalls?: Array<{
+        name: string;
+        arguments: Record<string, any>;
+        result: any;
+      }>;
+    };
+    timestamp: string;
+  };
 }
 
 export class MCPClient {
