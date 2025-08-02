@@ -3,30 +3,25 @@ import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import MessageTabs from './MessageTabs';
+import DoraemonLoader from './DoraemonLoader';
 import { Message } from '@/lib/chat-storage';
 
-interface StreamingWord {
-  id: number;
-  text: string;
-}
+
 
 interface ChatMessagesProps {
   messages: Message[];
-  streamingMessageId: string | null;
-  streamingWords: StreamingWord[];
+  isLoading?: boolean;
   completedMessages: Set<string>;
 }
 
 export default function ChatMessages({ 
   messages, 
-  streamingMessageId, 
-  streamingWords, 
+  isLoading = false,
   completedMessages 
 }: ChatMessagesProps) {
   const renderMessage = (message: Message) => {
     const isCompleted = completedMessages.has(message.id);
     const isUser = message.type === "user";
-    const isStreaming = message.id === streamingMessageId;
 
     return (
       <div key={message.id} className={cn(
@@ -53,8 +48,8 @@ export default function ChatMessages({
                 : "bg-card text-card-foreground border-border/50 dark:bg-card/95 dark:border-border/60"
             )}
           >
-            {!isUser && message.toolCalls ? (
-              <MessageTabs content={message.content} toolCalls={message.toolCalls} />
+            {!isUser && (message.toolCalls || message.mermaidCode) ? (
+              <MessageTabs content={message.content} toolCalls={message.toolCalls} mermaidCode={message?.mermaidCode} />
             ) : (
               <div className="space-y-2">
                 {message.content && (
@@ -64,17 +59,6 @@ export default function ChatMessages({
                     "dark:prose-invert"
                   )}>
                     <span className="whitespace-pre-wrap">{message.content}</span>
-                  </div>
-                )}
-
-                {isStreaming && (
-                  <div className="inline-flex items-center space-x-1">
-                    {streamingWords.map((word) => (
-                      <span key={word.id} className="animate-fade-in inline">
-                        {word.text}
-                      </span>
-                    ))}
-                    <span className="inline-block w-2 h-4 bg-current animate-pulse ml-1"></span>
                   </div>
                 )}
               </div>
@@ -163,6 +147,15 @@ export default function ChatMessages({
       ) : (
         <div className="space-y-6">
           {messages.map(renderMessage)}
+          {isLoading && (
+            <div className="flex flex-col animate-in fade-in-0 slide-in-from-bottom-2 duration-300 items-start">
+              <div className="flex items-start space-x-3 max-w-[85%] md:max-w-[75%] min-w-[280px] sm:min-w-[320px]">
+                <div className="flex-1 px-4 py-3 rounded-2xl transition-all duration-200 shadow-sm border bg-card text-card-foreground border-border/50 dark:bg-card/95 dark:border-border/60 min-w-[200px] sm:min-w-[240px]">
+                  <DoraemonLoader />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

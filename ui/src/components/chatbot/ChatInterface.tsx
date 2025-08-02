@@ -22,10 +22,7 @@ interface MessageSection {
   sectionIndex: number;
 }
 
-interface StreamingWord {
-  id: number;
-  text: string;
-}
+
 
 interface ChatState {
   messages: Message[];
@@ -34,9 +31,7 @@ interface ChatState {
   isConnected: boolean;
 }
 
-// Faster word delay for smoother streaming
-const WORD_DELAY = 40; // ms per word
-const CHUNK_SIZE = 2; // Number of words to add at once
+
 
 export default function ChatInterface() {
   const [inputValue, setInputValue] = useState("");
@@ -48,15 +43,12 @@ export default function ChatInterface() {
   const [isMobile, setIsMobile] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [messageSections, setMessageSections] = useState<MessageSection[]>([]);
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [streamingWords, setStreamingWords] = useState<StreamingWord[]>([]);
-  const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
   const [viewportHeight, setViewportHeight] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [completedMessages, setCompletedMessages] = useState<Set<string>>(new Set());
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
   const inputContainerRef = useRef<HTMLDivElement>(null);
-  const shouldFocusAfterStreamingRef = useRef(false);
+
   const mainContainerRef = useRef<HTMLDivElement>(null);
   const selectionStateRef = useRef<{ start: number | null; end: number | null }>({ start: null, end: null });
 
@@ -114,15 +106,7 @@ export default function ChatInterface() {
     }
   }, [messages]);
 
-  // Handle streaming completion
-  useEffect(() => {
-    if (!isStreaming && shouldFocusAfterStreamingRef.current) {
-      shouldFocusAfterStreamingRef.current = false;
-      setTimeout(() => {
-        focusTextarea();
-      }, 100);
-    }
-  }, [isStreaming]);
+
 
   // Update message sections when messages change
   useEffect(() => {
@@ -154,8 +138,14 @@ export default function ChatInterface() {
 
   const checkConnection = async () => {
     try {
-      const health = await mcpClient.healthCheck();
-      setChatState(prev => ({ ...prev, isConnected: health.status === 'healthy' }));
+      const health = await fetch('http://localhost:3939/health', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }); 
+      const data = await health.json();
+      setChatState(prev => ({ ...prev, isConnected: data.status === 'healthy' }));
     } catch (error) {
       console.error('Connection check failed:', error);
       setChatState(prev => ({ ...prev, isConnected: false }));
@@ -177,8 +167,6 @@ export default function ChatInterface() {
     setCurrentSession(newSession);
     setMessages([]);
     setMessageSections([]);
-    setStreamingWords([]);
-    setStreamingMessageId(null);
     setCompletedMessages(new Set());
     setActiveSectionId(null);
     setSidebarRefreshTrigger(prev => prev + 1);
@@ -198,8 +186,6 @@ export default function ChatInterface() {
       chatStorage.updateSession(currentSession.id, { messages: [] });
       setMessages([]);
       setMessageSections([]);
-      setStreamingWords([]);
-      setStreamingMessageId(null);
       setCompletedMessages(new Set());
       setActiveSectionId(null);
     }
@@ -237,28 +223,10 @@ export default function ChatInterface() {
     }
   };
 
-  const simulateTextStreaming = async (text: string) => {
-    const words = text.split(' ');
-    const streamingWords: StreamingWord[] = [];
-    
-    for (let i = 0; i < words.length; i += CHUNK_SIZE) {
-      const chunk = words.slice(i, i + CHUNK_SIZE);
-      chunk.forEach((word, index) => {
-        streamingWords.push({
-          id: i + index,
-          text: word + (i + index < words.length - 1 ? ' ' : '')
-        });
-      });
-      
-      setStreamingWords([...streamingWords]);
-      await new Promise(resolve => setTimeout(resolve, WORD_DELAY));
-    }
-    
-    return streamingWords.map(w => w.text).join('');
-  };
+
 
   const sendMessage = async () => {
-    if (!inputValue.trim() || isStreaming || !chatState.isConnected) return;
+    if (!inputValue.trim() || chatState.isLoading || !chatState.isConnected) return;
 
     const userMessage: Message = {
       id: `msg_${Date.now()}`,
@@ -271,102 +239,38 @@ export default function ChatInterface() {
     setMessages(prev => [...prev, userMessage]);
     setInputValue('');
     setHasTyped(false);
-    setIsStreaming(true);
+    setChatState(prev => ({ ...prev, isLoading: true }));
 
     try {
-      const response:any = await mcpClient.callTool({
-        name: 'intelligent_chat',
-        arguments: {
-          conversationId: chatState.conversationId,
-          message: inputValue.trim()
-        }
+      const response:any = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: inputValue.trim(),
+          conversationId: chatState.conversationId
+        })
       });
-      
+      const data = await response.json();
+
+      // Parse the MCP response to extract the actual message content
+      let responseContent = data?.data?.content;
+      let functionCalls = data?.data?.functionCalls;
+      let mermaidCode = data?.data?.mermaidCode;
+
       const aiMessage: Message = {
         id: `msg_${Date.now()}_ai`,
         type: 'system',
-        content: '',
+        content: responseContent || '',
         timestamp: new Date(),
-        completed: false,
-        toolCalls: response.result?.data?.functionCalls || []
+        completed: true,
+        toolCalls: functionCalls || [],
+        mermaidCode: mermaidCode
       };
 
       setMessages(prev => [...prev, aiMessage]);
-      setStreamingMessageId(aiMessage.id);
-      setStreamingWords([]);
-
-      // Parse the MCP response to extract the actual message content
-      let responseContent = '';
-      let functionCalls = [];
-      let mermaidCode = '';
-      console.log(mermaidCode);
-      
-      // Check if response has content array structure
-      if (response.content && Array.isArray(response.content) && response.content.length > 0) {
-        const firstContent = response.content[0];
-        if (firstContent.type === 'text' && firstContent.text) {
-          try {
-            // Parse the text content as JSON
-            const parsedText = JSON.parse(firstContent.text);
-            
-            // Extract the actual response data
-            if (parsedText.data?.response) {
-              responseContent = parsedText.data.response;
-              functionCalls = parsedText.data.functionCalls || [];
-              mermaidCode = parsedText.data.mermaidCode || '';
-            } else if (typeof parsedText === 'string') {
-              responseContent = parsedText;
-            } else {
-              responseContent = firstContent.text;
-            }
-          } catch (error) {
-            console.error('Error parsing response text as JSON:', error);
-            responseContent = firstContent.text;
-          }
-        }
-      } else if (response.result?.data?.response) {
-        // Fallback to the old structure
-        try {
-          // The response might be a JSON string that needs to be parsed
-          const responseData = response.result.data.response;
-          let parsedResponse;
-          
-          // Try to parse as JSON first
-          try {
-            parsedResponse = JSON.parse(responseData);
-          } catch {
-            // If it's not JSON, use the response as-is
-            parsedResponse = { data: { response: responseData } };
-          }
-          
-          // Extract the actual response content
-          if (parsedResponse.data?.response) {
-            responseContent = parsedResponse.data.response;
-            functionCalls = parsedResponse.data.functionCalls || [];
-            mermaidCode = parsedResponse.data.mermaidCode || '';
-          } else if (typeof parsedResponse === 'string') {
-            responseContent = parsedResponse;
-          } else {
-            responseContent = responseData;
-          }
-        } catch (error) {
-          console.error('Error parsing MCP response:', error);
-          responseContent = response.result.data.response;
-          mermaidCode = response.result.data.mermaidCode || '';
-        }
-      }
-      
-      if (responseContent) {
-        const streamedContent = await simulateTextStreaming(responseContent);
-        setMessages(prev => 
-          prev.map(msg => 
-            msg.id === aiMessage.id 
-              ? { ...msg, content: streamedContent, completed: true, toolCalls: functionCalls, mermaidCode: mermaidCode }
-              : msg
-          )
-        );
-        setCompletedMessages(prev => new Set([...prev, aiMessage.id]));
-      }
+      setCompletedMessages(prev => new Set([...prev, aiMessage.id]));
 
       if (currentSession) {
         chatStorage.addMessage(currentSession.id, userMessage);
@@ -390,10 +294,10 @@ export default function ChatInterface() {
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
-      setIsStreaming(false);
-      setStreamingMessageId(null);
-      setStreamingWords([]);
-      shouldFocusAfterStreamingRef.current = true;
+      setChatState(prev => ({ ...prev, isLoading: false }));
+      setTimeout(() => {
+        focusTextarea();
+      }, 100);
     }
   };
 
@@ -411,26 +315,12 @@ export default function ChatInterface() {
     const aiMessage: Message = {
       id: `msg_${Date.now()}_ai`,
       type: 'system',
-      content: '',
+      content: randomResponse,
       timestamp: new Date(),
-      completed: false
+      completed: true
     };
 
     setMessages(prev => [...prev, aiMessage]);
-    setStreamingMessageId(aiMessage.id);
-    setStreamingWords([]);
-
-    // Simulate streaming
-    const streamedContent = await simulateTextStreaming(randomResponse);
-    
-    setMessages(prev => 
-      prev.map(msg => 
-        msg.id === aiMessage.id 
-          ? { ...msg, content: streamedContent, completed: true }
-          : msg
-      )
-    );
-    
     setCompletedMessages(prev => new Set([...prev, aiMessage.id]));
     
     if (currentSession) {
@@ -507,7 +397,7 @@ export default function ChatInterface() {
               setHasTyped={setHasTyped}
               activeButton={activeButton}
               setActiveButton={setActiveButton}
-              isStreaming={isStreaming}
+              isStreaming={chatState.isLoading}
               isConnected={chatState.isConnected}
               isMobile={isMobile}
               textareaRef={textareaRef}
@@ -536,8 +426,7 @@ export default function ChatInterface() {
                 >
                   <ChatMessages
                     messages={messages}
-                    streamingMessageId={streamingMessageId}
-                    streamingWords={streamingWords}
+                    isLoading={chatState.isLoading}
                     completedMessages={completedMessages}
                   />
                   <div ref={messagesEndRef} />
@@ -555,7 +444,7 @@ export default function ChatInterface() {
                   setHasTyped={setHasTyped}
                   activeButton={activeButton}
                   setActiveButton={setActiveButton}
-                  isStreaming={isStreaming}
+                  isStreaming={chatState.isLoading}
                   isConnected={chatState.isConnected}
                   isMobile={isMobile}
                   textareaRef={textareaRef}

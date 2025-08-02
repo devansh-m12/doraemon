@@ -340,6 +340,8 @@ export class OpenRouterService extends BaseService {
 
     // Extract Mermaid code from the final message
     const mermaidCode = this.extractMermaidCode(finalMessage);
+
+    console.log(mermaidCode, "-------------------------");
     if (mermaidCode) {
       logger.info("Mermaid code extracted from response");
     }
