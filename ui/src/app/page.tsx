@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Send, Bot, User, Trash2, RefreshCw } from 'lucide-react';
 import { mcpClient } from '../lib/mcp-client';
+import MessageTabs from './components/MessageTabs';
 
 interface Message {
   id: string;
@@ -212,18 +213,10 @@ export default function Home() {
                     <div className="text-sm font-medium mb-1">
                       {message.role === 'user' ? 'You' : 'Assistant'}
                     </div>
-                    <div className="whitespace-pre-wrap">{message.content}</div>
-                    {message.toolCalls && message.toolCalls.length > 0 && (
-                      <div className="mt-3 pt-3 border-t border-gray-200">
-                        <div className="text-xs font-medium text-gray-600 mb-2">Tool Calls:</div>
-                        <div className="space-y-1">
-                          {message.toolCalls.map((tool, index) => (
-                            <div key={index} className="text-xs bg-gray-100 p-2 rounded">
-                              {tool.name}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
+                    {message.role === 'assistant' ? (
+                      <MessageTabs content={message.content} toolCalls={message.toolCalls} />
+                    ) : (
+                      <div className="whitespace-pre-wrap">{message.content}</div>
                     )}
                     <div className="text-xs opacity-70 mt-2">
                       {message.timestamp.toLocaleTimeString()}
