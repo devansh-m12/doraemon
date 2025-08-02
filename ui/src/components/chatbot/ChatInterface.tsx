@@ -274,7 +274,7 @@ export default function ChatInterface() {
     setIsStreaming(true);
 
     try {
-      const response = await mcpClient.callTool({
+      const response:any = await mcpClient.callTool({
         name: 'intelligent_chat',
         arguments: {
           conversationId: chatState.conversationId,
@@ -298,7 +298,8 @@ export default function ChatInterface() {
       // Parse the MCP response to extract the actual message content
       let responseContent = '';
       let functionCalls = [];
-      console.log(response);
+      let mermaidCode = '';
+      console.log(mermaidCode);
       
       // Check if response has content array structure
       if (response.content && Array.isArray(response.content) && response.content.length > 0) {
@@ -312,6 +313,7 @@ export default function ChatInterface() {
             if (parsedText.data?.response) {
               responseContent = parsedText.data.response;
               functionCalls = parsedText.data.functionCalls || [];
+              mermaidCode = parsedText.data.mermaidCode || '';
             } else if (typeof parsedText === 'string') {
               responseContent = parsedText;
             } else {
@@ -341,6 +343,7 @@ export default function ChatInterface() {
           if (parsedResponse.data?.response) {
             responseContent = parsedResponse.data.response;
             functionCalls = parsedResponse.data.functionCalls || [];
+            mermaidCode = parsedResponse.data.mermaidCode || '';
           } else if (typeof parsedResponse === 'string') {
             responseContent = parsedResponse;
           } else {
@@ -349,6 +352,7 @@ export default function ChatInterface() {
         } catch (error) {
           console.error('Error parsing MCP response:', error);
           responseContent = response.result.data.response;
+          mermaidCode = response.result.data.mermaidCode || '';
         }
       }
       
@@ -357,7 +361,7 @@ export default function ChatInterface() {
         setMessages(prev => 
           prev.map(msg => 
             msg.id === aiMessage.id 
-              ? { ...msg, content: streamedContent, completed: true, toolCalls: functionCalls }
+              ? { ...msg, content: streamedContent, completed: true, toolCalls: functionCalls, mermaidCode: mermaidCode }
               : msg
           )
         );
@@ -370,7 +374,8 @@ export default function ChatInterface() {
           ...aiMessage,
           content: responseContent || '',
           completed: true,
-          toolCalls: functionCalls
+          toolCalls: functionCalls,
+          mermaidCode: mermaidCode
         });
       }
     } catch (error) {

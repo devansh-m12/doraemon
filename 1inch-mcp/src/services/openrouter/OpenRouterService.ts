@@ -28,6 +28,7 @@ export type OpenRouterResponse = {
     description: string;
     result: any;
   }>;
+  mermaidCode?: string;
 }
 
 export class OpenRouterService extends BaseService {
@@ -241,8 +242,15 @@ export class OpenRouterService extends BaseService {
       });
       conversation.updatedAt = new Date();
 
+      // Extract Mermaid code from the direct response
+      const mermaidCode = this.extractMermaidCode(assistantMessage);
+      if (mermaidCode) {
+        logger.info("Mermaid code extracted from direct response");
+      }
+
       return {
         content: assistantMessage,
+        mermaidCode,
       };
     }
 
@@ -330,9 +338,16 @@ export class OpenRouterService extends BaseService {
     });
     conversation.updatedAt = new Date();
 
+    // Extract Mermaid code from the final message
+    const mermaidCode = this.extractMermaidCode(finalMessage);
+    if (mermaidCode) {
+      logger.info("Mermaid code extracted from response");
+    }
+
     return {
       content: finalMessage,
       functionCalls,
+      mermaidCode,
     };
   }
 
@@ -361,6 +376,28 @@ export class OpenRouterService extends BaseService {
     
     // Fallback to empty array if orchestrator is not available
     return [];
+  }
+
+  /**
+   * Extract Mermaid code from text content
+   */
+  private extractMermaidCode(content: string): string | undefined {
+    // Match mermaid code blocks with various formats
+    const mermaidPatterns = [
+      /```mermaid\s*\n([\s\S]*?)\n```/g,
+      /```\s*mermaid\s*\n([\s\S]*?)\n```/g,
+      /\bmermaid\s*\n([\s\S]*?)(?=\n\n|\n```|\n$)/g
+    ];
+
+    for (const pattern of mermaidPatterns) {
+      const matches = Array.from(content.matchAll(pattern));
+      if (matches.length > 0 && matches[0] && matches[0][1]) {
+        // Return the first mermaid code block found
+        return matches[0][1].trim();
+      }
+    }
+
+    return undefined;
   }
 
   /**

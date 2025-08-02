@@ -24,6 +24,7 @@ export interface MCPResponse {
         arguments: Record<string, any>;
         result: any;
       }>;
+      mermaidCode?: string;
     };
     timestamp: string;
   };

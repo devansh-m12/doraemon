@@ -15,6 +15,7 @@ export interface Message {
   role?: 'user' | 'assistant';
   timestamp?: Date;
   toolCalls?: any[];
+  mermaidCode?: string;
 }
 
 class ChatStorageService {
