@@ -48,6 +48,47 @@ module fusion_swap_addr::fusion_swap {
     }
 
     #[test_only]
+    public fun create_auction_data(start_price: u128, end_price: u128, start_time: u64, duration: u64, current_price: u128, min_fill_amount: u128, max_fill_amount: u128): AuctionData {
+        AuctionData { start_price, end_price, start_time, duration, current_price, min_fill_amount, max_fill_amount }
+    }
+    #[test_only]
+    public fun get_auction_start_price(data: &AuctionData): u128 { data.start_price }
+    #[test_only]
+    public fun get_auction_end_price(data: &AuctionData): u128 { data.end_price }
+    #[test_only]
+    public fun get_auction_start_time(data: &AuctionData): u64 { data.start_time }
+    #[test_only]
+    public fun get_auction_duration(data: &AuctionData): u64 { data.duration }
+    #[test_only]
+    public fun get_auction_current_price(data: &AuctionData): u128 { data.current_price }
+    #[test_only]
+    public fun get_auction_min_fill(data: &AuctionData): u128 { data.min_fill_amount }
+    #[test_only]
+    public fun get_auction_max_fill(data: &AuctionData): u128 { data.max_fill_amount }
+
+    #[test_only]
+    public fun create_hash_lock(hash: vector<u8>, secret: option::Option<vector<u8>>, is_revealed: bool): HashLock {
+        HashLock { hash, secret, is_revealed }
+    }
+    #[test_only]
+    public fun get_hashlock_hash(lock: &HashLock): vector<u8> { lock.hash }
+    #[test_only]
+    public fun get_hashlock_secret(lock: &HashLock): option::Option<vector<u8>> { lock.secret }
+    #[test_only]
+    public fun get_hashlock_is_revealed(lock: &HashLock): bool { lock.is_revealed }
+
+    #[test_only]
+    public fun create_time_lock(finality_lock: u64, exclusive_withdraw: u64, cancellation_timeout: u64): TimeLock {
+        TimeLock { finality_lock, exclusive_withdraw, cancellation_timeout }
+    }
+    #[test_only]
+    public fun get_timelock_finality(lock: &TimeLock): u64 { lock.finality_lock }
+    #[test_only]
+    public fun get_timelock_exclusive(lock: &TimeLock): u64 { lock.exclusive_withdraw }
+    #[test_only]
+    public fun get_timelock_cancellation(lock: &TimeLock): u64 { lock.cancellation_timeout }
+
+    #[test_only]
     public fun create_order_status(state: u8, last_updated: u64): OrderStatus {
         OrderStatus { state, last_updated }
     }
