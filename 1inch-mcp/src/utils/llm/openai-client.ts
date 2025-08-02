@@ -11,6 +11,16 @@ export interface LLMConfig {
   maxTokens?: number;
 }
 
+export interface FunctionDefinition {
+  name: string;
+  description: string;
+  parameters: {
+    type: string;
+    properties: Record<string, any>;
+    required: string[];
+  };
+}
+
 export class OpenAIClient {
   private client: OpenAI;
   private config: LLMConfig;
@@ -24,8 +34,6 @@ export class OpenAIClient {
       temperature: llmConfig?.temperature || config.openRouter.temperature,
       maxTokens: llmConfig?.maxTokens || config.openRouter.maxTokens,
     };
-
-
 
     if (!this.config.apiKey) {
       throw new Error('OpenAI API key is required. Please set OPENROUTER_API_KEY in your .env file.');
@@ -47,18 +55,32 @@ export class OpenAIClient {
     model?: string;
     temperature?: number;
     maxTokens?: number;
+    tools?: Array<{
+      type: "function";
+      function: FunctionDefinition;
+    }>;
+    tool_choice?: "auto" | "none";
   }): Promise<any> {
     try {
       const modelToUse = options?.model || this.config.model;
       if (!modelToUse) {
         throw new Error('No model specified. Please provide a model or configure one in the environment.');
       }
-      const response = await this.client.chat.completions.create({
+
+      const requestOptions: any = {
         model: modelToUse,
         messages,
         temperature: options?.temperature || this.config.temperature,
         max_tokens: options?.maxTokens || this.config.maxTokens,
-      });
+      };
+
+      // Add tools if provided
+      if (options?.tools) {
+        requestOptions.tools = options.tools;
+        requestOptions.tool_choice = options.tool_choice || "auto";
+      }
+
+      const response = await this.client.chat.completions.create(requestOptions);
 
       return {
         success: true,
@@ -67,6 +89,7 @@ export class OpenAIClient {
           model: response.model,
           usage: response.usage,
           finish_reason: response.choices[0]?.finish_reason,
+          tool_calls: response.choices[0]?.message?.tool_calls,
         },
       };
     } catch (error: any) {

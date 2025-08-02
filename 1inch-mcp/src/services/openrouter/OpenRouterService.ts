@@ -12,22 +12,48 @@ import { config } from '../../config/index';
 import { logger } from '../../config/logger';
 import { OpenAIClient } from '../../utils/llm/openai-client';
 
+export type OpenRouterKitConfig = {
+  openaiModel?: string;
+  openaiApiKey?: string;
+  baseUrl?: string;
+  temperature?: number;
+  maxTokens?: number;
+}
+
+export type OpenRouterResponse = {
+  content: string;
+  functionCalls?: Array<{
+    name: string;
+    arguments: Record<string, any>;
+    result: any;
+  }>;
+}
+
 export class OpenRouterService extends BaseService {
   private openRouterConfig: OpenRouterConfig;
   private conversations: Map<string, ConversationContext> = new Map();
   private orchestrator?: any;
   private openAIClient: OpenAIClient;
+  private config: OpenRouterKitConfig;
 
-  constructor(serviceConfig: any, orchestrator?: any) {
+  constructor(serviceConfig: any, orchestrator?: any, agentConfig: OpenRouterKitConfig = {}) {
     super(serviceConfig);
     this.orchestrator = orchestrator;
+    
+    this.config = {
+      openaiModel: "gpt-4o-mini",
+      temperature: 0.7,
+      maxTokens: 4000,
+      ...agentConfig,
+    };
+
     this.openRouterConfig = {
       baseUrl: config.openRouter.baseUrl,
       apiKey: config.openRouter.apiKey,
       timeout: config.openRouter.timeout,
       models: config.openRouter.models,
-      maxTokens: config.openRouter.maxTokens,
-      temperature: config.openRouter.temperature
+      maxTokens: this.config.maxTokens || config.openRouter.maxTokens,
+      temperature: this.config.temperature || config.openRouter.temperature
     };
     
     // Initialize OpenAI client
@@ -152,6 +178,194 @@ export class OpenRouterService extends BaseService {
     }
   }
 
+  /**
+   * Send a user prompt → let the model call your functions → return final answer.
+   */
+  async chat(userPrompt: string, conversationId?: string): Promise<OpenRouterResponse> {
+    logger.info("Starting chat with prompt:", userPrompt);
+    
+    // Get or create conversation context
+    const convId = conversationId || `conv_${Date.now()}`;
+    let conversation = this.conversations.get(convId);
+    if (!conversation) {
+      conversation = {
+        id: convId,
+        messages: [],
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      this.conversations.set(convId, conversation);
+    }
+
+    // Add user message to conversation
+    conversation.messages.push({
+      role: 'user',
+      content: userPrompt
+    });
+
+    // Get available function definitions
+    const fnDefs = this.getAvailableFunctionDefinitions();
+    logger.info(`Available functions: ${fnDefs.map(f => f.name).join(', ')}`);
+
+    // Step 1: Ask the model with function definitions
+    const first = await this.openAIClient.chatCompletion([
+      ...conversation.messages
+    ], {
+      model: this.config.openaiModel!,
+      temperature: this.config.temperature,
+      maxTokens: this.config.maxTokens,
+      tools: fnDefs.map(def => ({
+        type: "function" as const,
+        function: def
+      })),
+      tool_choice: "auto",
+    });
+
+    if (!first.success) {
+      throw new Error(first.error || 'Failed to get chat completion');
+    }
+
+    const msg = first.data;
+    logger.info("First response received:", msg);
+    
+    // Step 2: If it didn't call a function, just return the text
+    if (!msg.tool_calls || msg.tool_calls.length === 0) {
+      logger.info("No function calls made, returning direct response");
+      const assistantMessage = msg.completion || msg.content || "I apologize, but I was unable to generate a response.";
+      
+      // Add assistant response to conversation
+      conversation.messages.push({
+        role: 'assistant',
+        content: assistantMessage
+      });
+      conversation.updatedAt = new Date();
+
+      return {
+        content: assistantMessage,
+      };
+    }
+
+    // Step 3: Parse arguments & invoke your handler
+    const functionCalls: OpenRouterResponse['functionCalls'] = [];
+    
+    for (const toolCall of msg.tool_calls) {
+      const { name, arguments: argStr } = toolCall.function;
+      logger.info(`Raw function call - name: ${name}, arguments: ${argStr}`);
+      const args = JSON.parse(argStr || "{}");
+      
+      logger.info(`Calling function: ${name} with args:`, args);
+      
+      try {
+        const result = await this.executeToolCall(name, args);
+        functionCalls.push({
+          name,
+          arguments: args,
+          result,
+        });
+        logger.info(`Function ${name} completed successfully`);
+      } catch (error) {
+        logger.error(`Function ${name} failed:`, error);
+        functionCalls.push({
+          name,
+          arguments: args,
+          result: { error: error instanceof Error ? error.message : String(error) },
+        });
+      }
+    }
+
+    // Step 4: Send the function's results back into the chat for a final response
+    const messages: ChatMessage[] = [
+      ...conversation.messages
+    ];
+
+    // Add function results - match by index to avoid duplicates
+    for (let i = 0; i < functionCalls.length; i++) {
+      const call = functionCalls[i];
+      if (!call) continue; // Skip if call is undefined
+      
+      const toolCall = msg.tool_calls?.[i]; // Use optional chaining
+      if (toolCall && toolCall.function.name === call.name) {
+        messages.push({
+          role: "assistant",
+          content: `Function call: ${call.name}`,
+          name: call.name
+        });
+        messages.push({
+          role: "user",
+          content: JSON.stringify(call.result),
+        });
+      }
+    }
+
+    const second = await this.openAIClient.chatCompletion(messages, {
+      model: this.config.openaiModel!,
+      temperature: this.config.temperature,
+      maxTokens: this.config.maxTokens,
+    });
+
+    if (!second.success) {
+      throw new Error(second.error || 'Failed to get final chat completion');
+    }
+
+    const finalMessage = second.data.completion || second.data.content || "I apologize, but I was unable to generate a response.";
+    logger.debug("Final response received:", finalMessage);
+
+    // Add assistant response to conversation
+    conversation.messages.push({
+      role: 'assistant',
+      content: finalMessage
+    });
+    conversation.updatedAt = new Date();
+
+    return {
+      content: finalMessage,
+      functionCalls,
+    };
+  }
+
+  /**
+   * Get available function definitions
+   */
+  private getAvailableFunctionDefinitions(): any[] {
+    // Get orchestrator reference
+    const orchestrator = this.orchestrator;
+    
+    if (orchestrator) {
+      // Get all tools from orchestrator, excluding OpenRouter tools to avoid circular reference
+      const allTools = orchestrator.getAllTools();
+      return allTools
+        .filter((tool: ToolDefinition) => !tool.name.startsWith('intelligent_chat'))
+        .map((tool: ToolDefinition) => ({
+          name: tool.name,
+          description: tool.description,
+          parameters: tool.inputSchema
+        }));
+    }
+    
+    // Fallback to empty array if orchestrator is not available
+    return [];
+  }
+
+  /**
+   * Execute a tool call through the orchestrator
+   */
+  private async executeToolCall(name: string, args: any): Promise<any> {
+    const orchestrator = this.orchestrator;
+    
+    if (!orchestrator) {
+      throw new Error('Orchestrator not available');
+    }
+
+    // Validate tool exists
+    const toolInfo = orchestrator.getToolInfo(name);
+    if (!toolInfo) {
+      throw new Error(`Tool '${name}' not found`);
+    }
+
+    // Execute tool call
+    return await orchestrator.handleToolCall(name, args);
+  }
+
   private async handleAIAssistant(args: any): Promise<any> {
     const messages: ChatMessage[] = [
       {
@@ -165,6 +379,24 @@ export class OpenRouterService extends BaseService {
     ];
 
     return await this.handleChatCompletion({ messages });
+  }
+
+  private async handleIntelligentChat(args: any): Promise<any> {
+    this.validateRequiredParams(args, ['conversationId', 'message']);
+    
+    const { conversationId, message, model, temperature } = args;
+    
+    // Update config if provided
+    if (model) this.config.openaiModel = model;
+    if (temperature) this.config.temperature = temperature;
+    
+    const response = await this.chat(message, conversationId);
+    
+    return this.createSuccessResponse({
+      response: response.content,
+      conversationId,
+      functionCalls: response.functionCalls,
+    });
   }
 
   private async handleChatCompletion(args: any): Promise<any> {
@@ -203,399 +435,6 @@ export class OpenRouterService extends BaseService {
     }
   }
 
-  private async handleIntelligentChat(args: any): Promise<any> {
-    this.validateRequiredParams(args, ['conversationId', 'message']);
-    
-    const { conversationId, message, model, temperature } = args;
-    
-    // Get or create conversation context
-    let conversation = this.conversations.get(conversationId);
-    if (!conversation) {
-      conversation = {
-        id: conversationId,
-        messages: [],
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      this.conversations.set(conversationId, conversation);
-    }
-
-    // Add user message to conversation
-    conversation.messages.push({
-      role: 'user',
-      content: message
-    });
-
-    // Step 1: Analyze the user message to identify needed tools
-    const toolAnalysis = await this.analyzeMessageForTools(message);
-    
-    // Step 2: Execute tool calls if needed
-    let toolResults: ToolCallResult[] = [];
-    if (toolAnalysis.tools.length > 0) {
-      toolResults = await this.executeToolCalls(toolAnalysis.tools);
-    }
-
-    // Step 3: Create context-aware system message
-    const systemMessage = this.createSystemMessageWithContext(toolResults);
-    
-    // Step 4: Prepare messages for OpenRouter with tool results context
-    const messages: ChatMessage[] = [
-      systemMessage,
-      ...conversation.messages
-    ];
-
-    // Add tool results context if available
-    if (toolResults.length > 0) {
-      const toolContextMessage = this.createToolResultsContext(toolResults);
-      messages.push(toolContextMessage);
-    }
-
-    // Step 5: Call OpenRouter for response
-    const modelToUse = model || this.openRouterConfig.models.small || this.openRouterConfig.models.large;
-
-    try {
-      const result = await this.openAIClient.chatCompletion(messages, {
-        model: modelToUse,
-        temperature: temperature || this.openRouterConfig.temperature,
-        maxTokens: this.openRouterConfig.maxTokens,
-      });
-
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to get chat completion');
-      }
-
-      const assistantMessage = result.data.completion || 'I apologize, but I was unable to generate a response.';
-      
-      // Add assistant response to conversation
-      conversation.messages.push({
-        role: 'assistant',
-        content: assistantMessage
-      });
-      conversation.updatedAt = new Date();
-
-      return this.createSuccessResponse({
-        response: assistantMessage,
-        conversationId,
-        toolCalls: toolAnalysis.tools.length > 0 ? toolAnalysis.tools : undefined,
-        toolResults: toolResults.length > 0 ? toolResults : undefined,
-        model: result.data.model,
-        usage: result.data.usage
-      });
-    } catch (error) {
-      throw this.handleOpenRouterError(error);
-    }
-  }
-
-  private async analyzeMessageForTools(message: string): Promise<{tools: ToolCallRequest[], confidence: number}> {
-    const tools: ToolCallRequest[] = [];
-    let totalConfidence = 0;
-    
-    // Get available tools from orchestrator
-    const availableTools = this.getAvailableTools();
-    
-    for (const tool of availableTools) {
-      const toolCall = this.analyzeToolRelevance(tool, message);
-      if (toolCall) {
-        tools.push(toolCall);
-        totalConfidence += toolCall.confidence || 0;
-      }
-    }
-    
-    // Sort by confidence and limit to top 3
-    tools.sort((a, b) => (b.confidence || 0) - (a.confidence || 0));
-    const topTools = tools.slice(0, 3);
-    
-    return {
-      tools: topTools,
-      confidence: topTools.length > 0 ? totalConfidence / topTools.length : 0
-    };
-  }
-
-  private analyzeToolRelevance(tool: ToolDefinition, message: string): ToolCallRequest | null {
-    const messageLower = message.toLowerCase();
-    const toolName = tool.name.toLowerCase();
-    const description = tool.description.toLowerCase();
-    
-    let confidence = 0;
-    const args: Record<string, any> = {};
-    
-    // Check for exact tool name matches
-    if (messageLower.includes(toolName)) {
-      confidence += 0.8;
-    }
-    
-    // Check for description keywords
-    const keywords = this.extractKeywords(description);
-    for (const keyword of keywords) {
-      if (messageLower.includes(keyword)) {
-        confidence += 0.3;
-      }
-    }
-    
-    // Extract specific parameters based on tool type
-    this.extractToolParameters(tool, message, args);
-    
-    // Only return if confidence is high enough
-    if (confidence >= 0.3) {
-      return {
-        name: tool.name,
-        arguments: args,
-        confidence: Math.min(confidence, 1.0),
-        description: `Extracted from: ${message}`
-      };
-    }
-    
-    return null;
-  }
-
-  private extractKeywords(text: string): string[] {
-    const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'can', 'get', 'check', 'find', 'show', 'display', 'list', 'give', 'provide', 'return', 'fetch', 'retrieve']);
-    
-    return text
-      .split(/\s+/)
-      .map(word => word.toLowerCase().replace(/[^\w]/g, ''))
-      .filter(word => word.length > 2 && !stopWords.has(word));
-  }
-
-  private extractToolParameters(tool: ToolDefinition, message: string, args: Record<string, any>): void {
-    const messageLower = message.toLowerCase();
-    const toolName = tool.name.toLowerCase();
-    
-    // Extract wallet addresses
-    const walletMatch = message.match(/0x[a-fA-F0-9]{40}/);
-    if (walletMatch && (toolName.includes('balance') || toolName.includes('wallet') || toolName.includes('portfolio') || toolName.includes('nft'))) {
-      // Map to correct parameter names based on tool
-      if (toolName === 'get_balance') {
-        args.address = walletMatch[0];
-        args.chainId = 1; // Default to Ethereum mainnet
-      } else {
-        args.walletAddress = walletMatch[0];
-        args.chain = 1; // Default to Ethereum mainnet
-      }
-    }
-    
-    // Extract token addresses
-    const tokenMatch = message.match(/0x[a-fA-F0-9]{40}/);
-    if (tokenMatch && (toolName.includes('token') || toolName.includes('price') || toolName.includes('swap'))) {
-      args.tokenAddress = tokenMatch[0];
-      args.chain = 1;
-    }
-    
-    // Extract chain ID
-    const chainMatch = message.match(/chain\s*(?:id\s*)?(\d+)/i);
-    if (chainMatch && chainMatch[1]) {
-      const chainId = parseInt(chainMatch[1]);
-      if (toolName === 'get_balance') {
-        args.chainId = chainId;
-      } else {
-        args.chain = chainId;
-      }
-    }
-    
-    // Extract amounts
-    const amountMatch = message.match(/(\d+(?:\.\d+)?)\s*(?:tokens?|coins?|amount|eth|usd)/i);
-    if (amountMatch && amountMatch[1]) {
-      args.amount = amountMatch[1];
-    }
-    
-    // Extract limits
-    const limitMatch = message.match(/limit\s*(\d+)/i);
-    if (limitMatch && limitMatch[1]) {
-      args.limit = parseInt(limitMatch[1]);
-    }
-  }
-
-  private async executeToolCalls(toolCalls: ToolCallRequest[]): Promise<ToolCallResult[]> {
-    const results: ToolCallResult[] = [];
-    
-    for (const toolCall of toolCalls) {
-      try {
-        const startTime = Date.now();
-        
-        // Get orchestrator reference
-        const orchestrator = this.orchestrator;
-        
-        if (orchestrator) {
-          // Validate tool exists
-          const toolInfo = orchestrator.getToolInfo(toolCall.name);
-          if (!toolInfo) {
-            results.push({
-              success: false,
-              toolName: toolCall.name,
-              error: `Tool '${toolCall.name}' not found`,
-              executionTime: 0
-            });
-            continue;
-          }
-
-          // Execute tool call
-          const result = await orchestrator.handleToolCall(toolCall.name, toolCall.arguments);
-          
-          results.push({
-            success: true,
-            toolName: toolCall.name,
-            result: result,
-            executionTime: Date.now() - startTime
-          });
-        } else {
-          results.push({
-            success: false,
-            toolName: toolCall.name,
-            error: 'Orchestrator not available',
-            executionTime: Date.now() - startTime
-          });
-        }
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        results.push({
-          success: false,
-          toolName: toolCall.name,
-          error: errorMessage,
-          executionTime: 0
-        });
-        
-        logger.error(`Error executing tool call '${toolCall.name}':`, error);
-      }
-    }
-    
-    return results;
-  }
-
-  private createSystemMessageWithContext(toolResults: ToolCallResult[]): ChatMessage {
-    const successfulResults = toolResults.filter(r => r.success);
-    
-    let systemContent = `You are an intelligent AI assistant with access to blockchain and DeFi tools. You can help users with:
-
-1. **Wallet Analysis**: Check balances, allowances, and portfolio overviews
-2. **Token Information**: Get token details, prices, and market data
-3. **Trading**: Get swap quotes, orderbook data, and trading history
-4. **Market Data**: Access price charts, gas prices, and market trends
-5. **NFTs**: Check NFT balances and collections
-6. **Domain Services**: Resolve domains and get domain information
-
-Always provide helpful, accurate responses with context for the data you retrieve.`;
-
-    if (successfulResults.length > 0) {
-      systemContent += `\n\nI have executed some tools to gather data for you. Use this information to provide a comprehensive response.`;
-    }
-
-    return {
-      role: 'system',
-      content: systemContent
-    };
-  }
-
-  private createToolResultsContext(toolResults: ToolCallResult[]): ChatMessage {
-    const successfulResults = toolResults.filter(r => r.success);
-    const failedResults = toolResults.filter(r => !r.success);
-    
-    let contextContent = '**Tool Execution Results:**\n\n';
-    
-    if (successfulResults.length > 0) {
-      contextContent += '✅ **Successful Tool Calls:**\n';
-      for (const result of successfulResults) {
-        contextContent += `• **${result.toolName}** (${result.executionTime}ms): `;
-        
-        // Add intelligent summary of the result
-        const summary = this.generateResultSummary(result);
-        contextContent += summary + '\n';
-      }
-    }
-    
-    if (failedResults.length > 0) {
-      contextContent += '\n❌ **Failed Tool Calls:**\n';
-      for (const result of failedResults) {
-        contextContent += `• **${result.toolName}**: ${result.error}\n`;
-      }
-    }
-    
-    return {
-      role: 'assistant',
-      content: contextContent
-    };
-  }
-
-  private generateResultSummary(result: ToolCallResult): string {
-    if (!result.result || typeof result.result !== 'object') {
-      return 'Data retrieved';
-    }
-
-    const data = result.result.data || result.result;
-    const toolName = result.toolName.toLowerCase();
-    
-    // Balance-related summaries
-    if (toolName.includes('balance')) {
-      if (Array.isArray(data)) {
-        return `Found ${data.length} token balances`;
-      } else if (data.balances) {
-        const tokenCount = Object.keys(data.balances).length;
-        return `Retrieved ${tokenCount} token balances`;
-      }
-    }
-    
-    // Price-related summaries
-    if (toolName.includes('price') || toolName.includes('spot')) {
-      if (data.price) {
-        return `Current price: $${data.price}`;
-      } else if (data.spotPrice) {
-        return `Spot price: $${data.spotPrice}`;
-      }
-    }
-    
-    // Swap-related summaries
-    if (toolName.includes('swap') || toolName.includes('quote')) {
-      if (data.quote) {
-        return `Swap quote available`;
-      } else if (data.toTokenAmount) {
-        return `Estimated output: ${data.toTokenAmount}`;
-      }
-    }
-    
-    // Token-related summaries
-    if (toolName.includes('token')) {
-      if (data.symbol) {
-        return `Token: ${data.symbol} (${data.name})`;
-      } else if (Array.isArray(data)) {
-        return `Found ${data.length} tokens`;
-      }
-    }
-    
-    // Portfolio-related summaries
-    if (toolName.includes('portfolio')) {
-      if (data.totalValue) {
-        return `Portfolio value: $${data.totalValue}`;
-      } else if (data.holdings) {
-        return `Portfolio holdings retrieved`;
-      }
-    }
-    
-    // Generic summary
-    if (Array.isArray(data)) {
-      return `Retrieved ${data.length} items`;
-    } else if (typeof data === 'object') {
-      const keys = Object.keys(data);
-      if (keys.length > 0) {
-        return `Data retrieved with fields: ${keys.slice(0, 3).join(', ')}${keys.length > 3 ? '...' : ''}`;
-      }
-    }
-    
-    return 'Data retrieved';
-  }
-
-  private getAvailableTools(): ToolDefinition[] {
-    // Get orchestrator reference
-    const orchestrator = this.orchestrator;
-    
-    if (orchestrator) {
-      // Get all tools from orchestrator, excluding OpenRouter tools to avoid circular reference
-      const allTools = orchestrator.getAllTools();
-      return allTools.filter((tool: ToolDefinition) => !tool.name.startsWith('intelligent_chat'));
-    }
-    
-    // Fallback to empty array if orchestrator is not available
-    return [];
-  }
-
   private handleOpenRouterError(error: any): Error {
     if (error.response?.data?.error) {
       const openRouterError = error.response.data;
@@ -612,4 +451,20 @@ Always provide helpful, accurate responses with context for the data you retriev
     
     return new Error(`Unexpected error: ${error.message}`);
   }
+}
+
+/**
+ * Convenience function for quick usage
+ */
+export async function createOpenRouterAgent(config?: OpenRouterKitConfig): Promise<OpenRouterService> {
+  return new OpenRouterService({}, undefined, config);
+}
+
+/**
+ * Legacy function for backward compatibility
+ */
+export async function llmAgent(userPrompt: string, config?: OpenRouterKitConfig): Promise<string> {
+  const agent = new OpenRouterService({}, undefined, config);
+  const response = await agent.chat(userPrompt);
+  return response.content;
 } 
