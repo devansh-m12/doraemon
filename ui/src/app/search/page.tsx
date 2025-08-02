@@ -63,7 +63,19 @@ export default function Home() {
 
       // Parse the response safely
       console.log('MCP Response:', data);
-      const responseText = data?.content?.[0]?.text;
+      let responseText;
+      if (data && typeof data === 'object') {
+        // Handle different possible response structures
+        if ('content' in data && Array.isArray(data.content)) {
+          responseText = data.content[0]?.text;
+        } else if ('data' in data) {
+          responseText = data.data;
+        } else if ('response' in data) {
+          responseText = data.response;
+        } else {
+          responseText = JSON.stringify(data);
+        }
+      }
       console.log('Response text:', responseText);
       let tokens = [];
       

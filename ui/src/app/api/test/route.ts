@@ -30,8 +30,21 @@ export async function POST(request: NextRequest) {
 
     console.log('MCP result:', result);
 
-    // Parse the response
-    const responseText = result.content[0]?.text;
+    // Parse the response - handle different response structures
+    let responseText;
+    if (result && typeof result === 'object') {
+      // Handle different possible response structures
+      if ('content' in result && Array.isArray(result.content)) {
+        responseText = result.content[0]?.text;
+      } else if ('data' in result) {
+        responseText = result.data;
+      } else if ('response' in result) {
+        responseText = result.response;
+      } else {
+        responseText = JSON.stringify(result);
+      }
+    }
+    
     let response;
     
     try {
