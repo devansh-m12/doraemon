@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from '@/components/ui/badge';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { Menu, PenSquare, Zap, Plus, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -82,6 +83,7 @@ export default function ChatHeader({
             <Settings className="h-4 w-4" />
             <span className="sr-only">Settings</span>
           </Button>
+          <ThemeToggle />
         </div>
       </div>
     </header>
