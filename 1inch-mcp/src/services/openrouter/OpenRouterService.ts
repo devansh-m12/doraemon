@@ -297,7 +297,13 @@ export class OpenRouterService extends BaseService {
       }
     }
 
-    const second = await this.openAIClient.chatCompletion(messages, {
+    const second = await this.openAIClient.chatCompletion([
+      {
+        role: 'system',
+        content: 'Always respond in markdown format (.md) to make rendering easier in frontend applications. Use proper markdown syntax for formatting, lists, code blocks, and other elements.'
+      },
+      ...messages
+    ], {
       model: this.config.openaiModel!,
       temperature: this.config.temperature,
       maxTokens: this.config.maxTokens,

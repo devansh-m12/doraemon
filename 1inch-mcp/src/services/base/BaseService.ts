@@ -46,7 +46,7 @@ export abstract class BaseService {
     
     this.client = axios.create({
       baseURL: this.baseUrl,
-      timeout: serviceConfig.timeout || 30000,
+      timeout: serviceConfig.timeout || 300000,
       headers: {
         'Authorization': `Bearer ${this.apiKey}`,
         'Content-Type': 'application/json',
