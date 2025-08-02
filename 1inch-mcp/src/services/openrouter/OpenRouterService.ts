@@ -364,8 +364,14 @@ export class OpenRouterService extends BaseService {
     // Extract wallet addresses
     const walletMatch = message.match(/0x[a-fA-F0-9]{40}/);
     if (walletMatch && (toolName.includes('balance') || toolName.includes('wallet') || toolName.includes('portfolio') || toolName.includes('nft'))) {
-      args.walletAddress = walletMatch[0];
-      args.chain = 1; // Default to Ethereum mainnet
+      // Map to correct parameter names based on tool
+      if (toolName === 'get_balance') {
+        args.address = walletMatch[0];
+        args.chainId = 1; // Default to Ethereum mainnet
+      } else {
+        args.walletAddress = walletMatch[0];
+        args.chain = 1; // Default to Ethereum mainnet
+      }
     }
     
     // Extract token addresses
@@ -378,7 +384,12 @@ export class OpenRouterService extends BaseService {
     // Extract chain ID
     const chainMatch = message.match(/chain\s*(?:id\s*)?(\d+)/i);
     if (chainMatch && chainMatch[1]) {
-      args.chain = parseInt(chainMatch[1]);
+      const chainId = parseInt(chainMatch[1]);
+      if (toolName === 'get_balance') {
+        args.chainId = chainId;
+      } else {
+        args.chain = chainId;
+      }
     }
     
     // Extract amounts
