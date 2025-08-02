@@ -10,7 +10,11 @@ export interface MCPToolCall {
 }
 
 export interface MCPResponse {
-  result: {
+  content?: Array<{
+    type: string;
+    text: string;
+  }>;
+  result?: {
     success: boolean;
     data: {
       response: string;

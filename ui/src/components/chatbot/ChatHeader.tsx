@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from '@/components/ui/badge';
-import { Menu, PenSquare, Zap, Plus } from "lucide-react";
+import { Menu, PenSquare, Zap, Plus, Settings } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface ChatHeaderProps {
   isConnected: boolean;
@@ -16,46 +17,70 @@ export default function ChatHeader({
   onNewSession 
 }: ChatHeaderProps) {
   return (
-    <header className="fixed top-0 left-0 right-0 h-12 flex items-center px-4 z-30 bg-white border-b border-gray-200 shadow-sm">
-      <div className="w-full flex items-center justify-between px-2">
+    <header className="sticky top-0 z-30 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="flex h-14 items-center gap-4 px-4 md:px-6 lg:px-8">
+        {/* Sidebar Toggle */}
         <Button 
           variant="ghost" 
           size="icon" 
-          className="rounded-full h-8 w-8 hover:bg-gray-100"
+          className="h-9 w-9 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
           onClick={onToggleSidebar}
         >
-          <Menu className="h-5 w-5 text-gray-700" />
+          <Menu className="h-4 w-4" />
           <span className="sr-only">Toggle Sidebar</span>
         </Button>
 
-        <div className="flex items-center space-x-2">
-          <div className="w-6 h-6 bg-primary rounded-lg flex items-center justify-center">
-            <Zap className="w-4 h-4 text-primary-foreground" />
+        {/* Brand & Status */}
+        <div className="flex items-center gap-3 flex-1">
+          <div className="flex items-center gap-3">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/80 shadow-sm">
+              <Zap className="h-4 w-4 text-primary-foreground" />
+            </div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-semibold text-foreground hidden sm:block">Doraemon</h1>
+              <Badge 
+                variant={isConnected ? 'default' : 'destructive'} 
+                className={cn(
+                  "text-xs font-medium px-2 py-0.5 transition-all duration-200",
+                  isConnected ? "bg-green-500/10 text-green-600 border-green-500/20" : "bg-red-500/10 text-red-600 border-red-500/20"
+                )}
+              >
+                {isConnected ? 'Live' : 'Offline'}
+              </Badge>
+            </div>
           </div>
-          <h1 className="text-base font-medium text-gray-800 hidden sm:block">Doraemon</h1>
-          <Badge variant={isConnected ? 'default' : 'destructive'} className="text-xs">
-            {isConnected ? 'Live' : 'Offline'}
-          </Badge>
         </div>
 
-        <div className="flex items-center space-x-1">
+        {/* Action Buttons */}
+        <div className="flex items-center gap-1">
           <Button 
             variant="ghost" 
             size="icon" 
-            className="rounded-full h-8 w-8 hover:bg-gray-100"
+            className="h-9 w-9 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
             onClick={onNewSession}
+            title="New Chat"
           >
-            <Plus className="h-5 w-5 text-gray-700" />
+            <Plus className="h-4 w-4" />
             <span className="sr-only">New Chat</span>
           </Button>
           <Button 
             variant="ghost" 
             size="icon" 
-            className="rounded-full h-8 w-8 hover:bg-gray-100"
+            className="h-9 w-9 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
             onClick={onClearConversation}
+            title="Clear Chat"
           >
-            <PenSquare className="h-5 w-5 text-gray-700" />
+            <PenSquare className="h-4 w-4" />
             <span className="sr-only">Clear Chat</span>
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-9 w-9 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
+            title="Settings"
+          >
+            <Settings className="h-4 w-4" />
+            <span className="sr-only">Settings</span>
           </Button>
         </div>
       </div>

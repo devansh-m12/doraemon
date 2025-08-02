@@ -10,9 +10,11 @@ import {
   X,
   MoreVertical,
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  Sparkles
 } from "lucide-react";
 import { ChatSession, chatStorage } from '@/lib/chat-storage';
+import { cn } from '@/lib/utils';
 
 interface SessionSidebarProps {
   isOpen: boolean;
@@ -127,20 +129,20 @@ export default function SessionSidebar({
       {/* Backdrop */}
       {isOpen && (
         <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
           onClick={onClose}
         />
       )}
 
       {/* Delete Confirmation Modal */}
       {sessionToDelete && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg p-6 max-w-sm w-full">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-background rounded-lg p-6 max-w-sm w-full border border-border/50 shadow-lg">
             <div className="flex items-center mb-4">
               <AlertTriangle className="h-5 w-5 text-red-500 mr-2" />
               <h3 className="text-lg font-semibold">Delete Session</h3>
             </div>
-            <p className="text-gray-600 mb-6">
+            <p className="text-muted-foreground mb-6">
               Are you sure you want to delete this chat session? This action cannot be undone.
             </p>
             <div className="flex space-x-3">
@@ -164,17 +166,17 @@ export default function SessionSidebar({
       )}
 
       {/* Sidebar */}
-      <div className={`
-        fixed top-0 left-0 h-full w-80 bg-white border-r border-gray-200 z-50
-        transform transition-transform duration-300 ease-in-out
-        ${isOpen ? 'translate-x-0' : '-translate-x-full'}
-        lg:relative lg:translate-x-0 lg:z-0 lg:border-r-0
-      `}>
+      <div className={cn(
+        "fixed top-0 left-0 h-full w-80 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-r border-border/40 z-50",
+        "transform transition-transform duration-300 ease-in-out",
+        isOpen ? 'translate-x-0' : '-translate-x-full',
+        "lg:relative lg:translate-x-0 lg:z-0 lg:border-r-0"
+      )}>
         <div className="flex flex-col h-full">
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
+          <div className="flex items-center justify-between p-4 border-b border-border/40 bg-muted/20">
             <div className="flex items-center space-x-2">
-              <h2 className="text-lg font-semibold text-gray-900">Chat Sessions</h2>
+              <h2 className="text-lg font-semibold text-foreground">Chat Sessions</h2>
               <Badge variant="secondary" className="text-xs">
                 {sessionsCount}
               </Badge>
@@ -184,7 +186,7 @@ export default function SessionSidebar({
                 variant="ghost"
                 size="icon"
                 onClick={handleNewSession}
-                className="h-8 w-8 hover:bg-gray-200"
+                className="h-8 w-8 hover:bg-accent hover:text-accent-foreground transition-colors"
                 title="New Chat"
               >
                 <Plus className="h-4 w-4" />
@@ -194,7 +196,7 @@ export default function SessionSidebar({
                   variant="ghost"
                   size="icon"
                   onClick={handleClearAllSessions}
-                  className="h-8 w-8 hover:bg-red-100 text-red-600"
+                  className="h-8 w-8 hover:bg-red-100 text-red-600 transition-colors"
                   title="Clear All Sessions"
                 >
                   <Trash2 className="h-4 w-4" />
@@ -204,7 +206,7 @@ export default function SessionSidebar({
                 variant="ghost"
                 size="icon"
                 onClick={onClose}
-                className="h-8 w-8 hover:bg-gray-200 lg:hidden"
+                className="h-8 w-8 lg:hidden hover:bg-accent hover:text-accent-foreground transition-colors"
               >
                 <X className="h-4 w-4" />
               </Button>
@@ -214,96 +216,65 @@ export default function SessionSidebar({
           {/* Sessions List */}
           <div className="flex-1 overflow-y-auto p-4 space-y-2">
             {sessions.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                <p className="text-sm">No chat sessions yet</p>
-                <p className="text-xs mt-1">Start a new conversation to get started</p>
-              </div>
-            ) : sessions.length === 1 ? (
-              <div className="space-y-2">
-                <div className="text-center py-2 text-xs text-gray-500 bg-blue-50 rounded-lg">
-                  <p>This is your only chat session</p>
-                  <p className="text-xs mt-1">Create more sessions to organize your conversations</p>
-                </div>
-                {sessions.map((session) => (
-                  <div
-                    key={session.id}
-                    className={`
-                      group relative p-3 rounded-lg border cursor-pointer transition-all
-                      ${session.id === currentSessionId 
-                        ? 'bg-blue-50 border-blue-200 shadow-sm' 
-                        : 'bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300'
-                      }
-                    `}
-                    onClick={() => onSessionSelect(session)}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-sm font-medium text-gray-900 truncate">
-                          {truncateTitle(session.title)}
-                        </h3>
-                        <div className="flex items-center mt-1 text-xs text-gray-500">
-                          <Clock className="h-3 w-3 mr-1" />
-                          {formatDate(session.updatedAt)}
-                        </div>
-                        {session.messages.length > 0 && (
-                          <Badge variant="secondary" className="mt-2 text-xs">
-                            {session.messages.length} messages
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
+              <div className="text-center py-8">
+                <MessageSquare className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
+                <p className="text-muted-foreground">No chat sessions yet</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleNewSession}
+                  className="mt-4"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Start New Chat
+                </Button>
               </div>
             ) : (
               sessions.map((session) => (
                 <div
                   key={session.id}
-                  className={`
-                    group relative p-3 rounded-lg border cursor-pointer transition-all
-                    ${session.id === currentSessionId 
-                      ? 'bg-blue-50 border-blue-200 shadow-sm' 
-                      : 'bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300'
-                    }
-                  `}
+                  className={cn(
+                    "group relative p-3 rounded-lg border border-border/50 bg-card hover:bg-accent/50 transition-all duration-200 cursor-pointer",
+                    session.id === currentSessionId && "bg-accent border-accent/50 shadow-sm"
+                  )}
                   onClick={() => onSessionSelect(session)}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-medium text-gray-900 truncate">
-                        {truncateTitle(session.title)}
-                      </h3>
-                      <div className="flex items-center mt-1 text-xs text-gray-500">
-                        <Clock className="h-3 w-3 mr-1" />
-                        {formatDate(session.updatedAt)}
+                      <div className="flex items-center gap-2 mb-1">
+                        <MessageSquare className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        <h3 className="font-medium text-sm text-foreground truncate">
+                          {truncateTitle(session.title)}
+                        </h3>
+                        {session.id === currentSessionId && (
+                          <Badge variant="default" className="text-xs px-1.5 py-0">
+                            Active
+                          </Badge>
+                        )}
                       </div>
-                      {session.messages.length > 0 && (
-                        <Badge variant="secondary" className="mt-2 text-xs">
-                          {session.messages.length} messages
-                        </Badge>
-                      )}
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Clock className="h-3 w-3" />
+                        <span>{formatDate(session.updatedAt)}</span>
+                        <span>•</span>
+                        <span>{session.messages.length} messages</span>
+                      </div>
                     </div>
                     
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={`h-6 w-6 transition-opacity ${
-                        sessionsCount <= 1 
-                          ? 'opacity-50 cursor-not-allowed' 
-                          : 'opacity-0 group-hover:opacity-100'
-                      }`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (sessionsCount > 1) {
+                    {/* Action Menu */}
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 hover:bg-destructive/10 hover:text-destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
                           confirmDeleteSession(session.id);
-                        }
-                      }}
-                      disabled={sessionsCount <= 1}
-                      title={sessionsCount <= 1 ? "Cannot delete the last session" : "Delete session"}
-                    >
-                      <Trash2 className="h-3 w-3 text-red-500" />
-                    </Button>
+                        }}
+                        title="Delete Session"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ))
@@ -311,15 +282,14 @@ export default function SessionSidebar({
           </div>
 
           {/* Footer */}
-          <div className="p-4 border-t border-gray-200 bg-gray-50">
-            <Button
-              variant="outline"
-              className="w-full hover:bg-white"
-              onClick={handleNewSession}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              New Chat
-            </Button>
+          <div className="p-4 border-t border-border/40 bg-muted/20">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Doraemon AI</span>
+              <div className="flex items-center gap-1">
+                <Sparkles className="h-3 w-3" />
+                <span>Powered by AI</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>

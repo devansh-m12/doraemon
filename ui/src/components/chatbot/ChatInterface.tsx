@@ -9,6 +9,8 @@ import ChatMessages from './ChatMessages';
 import ChatInput from './ChatInput';
 import WelcomeCard from './WelcomeCard';
 import SessionSidebar from './SessionSidebar';
+import ChatContainer from './ChatContainer';
+import { cn } from '@/lib/utils';
 
 type ActiveButton = "none" | "add" | "deepSearch" | "think";
 type MessageType = "user" | "system";
@@ -72,13 +74,6 @@ export default function ChatInterface() {
     isConnected: false
   });
 
-  // Constants for layout calculations
-  const HEADER_HEIGHT = 48;
-  const INPUT_AREA_HEIGHT = 100;
-  const TOP_PADDING = 48;
-  const BOTTOM_PADDING = 128;
-  const ADDITIONAL_OFFSET = 16;
-
   // Check connection on mount
   useEffect(() => {
     checkConnection();
@@ -100,109 +95,63 @@ export default function ChatInterface() {
     }
   }, [currentSession]);
 
-  // Check if device is mobile and get viewport height
+  // Check mobile and viewport on mount and resize
   useEffect(() => {
     const checkMobileAndViewport = () => {
-      const isMobileDevice = window.innerWidth < 768;
-      setIsMobile(isMobileDevice);
-
-      const vh = window.innerHeight;
-      setViewportHeight(vh);
-
-      if (isMobileDevice && mainContainerRef.current) {
-        mainContainerRef.current.style.height = `${vh}px`;
-      }
+      const isMobileView = window.innerWidth < 768;
+      setIsMobile(isMobileView);
+      setViewportHeight(window.innerHeight);
     };
 
     checkMobileAndViewport();
+    window.addEventListener('resize', checkMobileAndViewport);
+    return () => window.removeEventListener('resize', checkMobileAndViewport);
+  }, []);
 
-    if (mainContainerRef.current) {
-      mainContainerRef.current.style.height = isMobile ? `${viewportHeight}px` : "100svh";
-    }
-
-    window.addEventListener("resize", checkMobileAndViewport);
-
-    return () => {
-      window.removeEventListener("resize", checkMobileAndViewport);
-    };
-  }, [isMobile, viewportHeight]);
-
-  // Organize messages into sections
+  // Auto-scroll to bottom when new messages are added
   useEffect(() => {
-    if (messages.length === 0) {
-      setMessageSections([]);
-      setActiveSectionId(null);
-      return;
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
+  }, [messages]);
 
+  // Handle streaming completion
+  useEffect(() => {
+    if (!isStreaming && shouldFocusAfterStreamingRef.current) {
+      shouldFocusAfterStreamingRef.current = false;
+      setTimeout(() => {
+        focusTextarea();
+      }, 100);
+    }
+  }, [isStreaming]);
+
+  // Update message sections when messages change
+  useEffect(() => {
     const sections: MessageSection[] = [];
-    let currentSection: MessageSection = {
-      id: `section-${Date.now()}-0`,
-      messages: [],
-      isNewSection: false,
-      sectionIndex: 0,
-    };
+    let currentSection: Message[] = [];
+    let sectionIndex = 0;
 
-    messages.forEach((message) => {
-      if (message.newSection) {
-        if (currentSection.messages.length > 0) {
-          sections.push({
-            ...currentSection,
-            isActive: false,
-          });
-        }
-
-        const newSectionId = `section-${Date.now()}-${sections.length}`;
-        currentSection = {
-          id: newSectionId,
-          messages: [message],
-          isNewSection: true,
-          isActive: true,
-          sectionIndex: sections.length,
-        };
-
-        setActiveSectionId(newSectionId);
-      } else {
-        currentSection.messages.push(message);
+    messages.forEach((message, index) => {
+      currentSection.push(message);
+      
+      // Create new section if next message is from different type or if it's the last message
+      const nextMessage = messages[index + 1];
+      const shouldCreateNewSection = !nextMessage || nextMessage.type !== message.type;
+      
+      if (shouldCreateNewSection && currentSection.length > 0) {
+        sections.push({
+          id: `section-${sectionIndex}`,
+          messages: [...currentSection],
+          isNewSection: index === 0,
+          sectionIndex
+        });
+        currentSection = [];
+        sectionIndex++;
       }
     });
 
-    if (currentSection.messages.length > 0) {
-      sections.push(currentSection);
-    }
-
     setMessageSections(sections);
   }, [messages]);
-
-  // Scroll to maximum position when new section is created
-  useEffect(() => {
-    if (messageSections.length > 1) {
-      setTimeout(() => {
-        const scrollContainer = chatContainerRef.current;
-        if (scrollContainer) {
-          scrollContainer.scrollTo({
-            top: scrollContainer.scrollHeight,
-            behavior: "smooth",
-          });
-        }
-      }, 100);
-    }
-  }, [messageSections]);
-
-  // Focus the textarea on component mount (only on desktop)
-  useEffect(() => {
-    if (textareaRef.current && !isMobile) {
-      textareaRef.current.focus();
-    }
-  }, [isMobile]);
-
-  // Set focus back to textarea after streaming ends (only on desktop)
-  useEffect(() => {
-    if (!isStreaming && shouldFocusAfterStreamingRef.current && !isMobile) {
-      focusTextarea();
-      shouldFocusAfterStreamingRef.current = false;
-    }
-  }, [isStreaming, isMobile]);
 
   const checkConnection = async () => {
     try {
@@ -214,10 +163,14 @@ export default function ChatInterface() {
     }
   };
 
-  // Session management functions
   const initializeSession = () => {
-    const session = chatStorage.ensureSessionExists();
-    setCurrentSession(session);
+    const sessions = chatStorage.getSessions();
+    if (sessions.length === 0) {
+      const newSession = chatStorage.createSession();
+      setCurrentSession(newSession);
+    } else {
+      setCurrentSession(sessions[0]);
+    }
   };
 
   const handleNewSession = () => {
@@ -225,10 +178,11 @@ export default function ChatInterface() {
     setCurrentSession(newSession);
     setMessages([]);
     setMessageSections([]);
+    setStreamingWords([]);
+    setStreamingMessageId(null);
     setCompletedMessages(new Set());
     setActiveSectionId(null);
-    setIsSidebarOpen(false);
-    setSidebarRefreshTrigger(prev => prev + 1); // Trigger sidebar refresh
+    setSidebarRefreshTrigger(prev => prev + 1);
   };
 
   const handleSessionSelect = (session: ChatSession) => {
@@ -245,273 +199,250 @@ export default function ChatInterface() {
       chatStorage.updateSession(currentSession.id, { messages: [] });
       setMessages([]);
       setMessageSections([]);
+      setStreamingWords([]);
+      setStreamingMessageId(null);
       setCompletedMessages(new Set());
       setActiveSectionId(null);
     }
   };
 
-  // Calculate available content height
   const getContentHeight = () => {
-    return viewportHeight - TOP_PADDING - BOTTOM_PADDING - ADDITIONAL_OFFSET;
+    return viewportHeight - 200; // Adjusted for better responsive design
   };
 
-  // Save the current selection state
   const saveSelectionState = () => {
     if (textareaRef.current) {
-      selectionStateRef.current = {
-        start: textareaRef.current.selectionStart,
-        end: textareaRef.current.selectionEnd,
-      };
+      const { selectionStart, selectionEnd } = textareaRef.current;
+      selectionStateRef.current = { start: selectionStart, end: selectionEnd };
     }
   };
 
-  // Restore the saved selection state
   const restoreSelectionState = () => {
-    const textarea = textareaRef.current;
-    const { start, end } = selectionStateRef.current;
-
-    if (textarea && start !== null && end !== null) {
-      textarea.focus();
-      textarea.setSelectionRange(start, end);
-    } else if (textarea) {
-      textarea.focus();
+    if (textareaRef.current && selectionStateRef.current.start !== null) {
+      textareaRef.current.setSelectionRange(
+        selectionStateRef.current.start,
+        selectionStateRef.current.end
+      );
     }
   };
 
   const focusTextarea = () => {
-    if (textareaRef.current && !isMobile) {
+    if (textareaRef.current) {
       textareaRef.current.focus();
     }
   };
 
   const handleInputContainerClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (
-      e.target === e.currentTarget ||
-      (e.currentTarget === inputContainerRef.current && !(e.target as HTMLElement).closest("button"))
-    ) {
-      if (textareaRef.current) {
-        textareaRef.current.focus();
-      }
+    if (e.target === e.currentTarget) {
+      focusTextarea();
     }
   };
 
   const simulateTextStreaming = async (text: string) => {
-    const words = text.split(" ");
-    let currentIndex = 0;
-    setStreamingWords([]);
-    setIsStreaming(true);
-
-    return new Promise<void>((resolve) => {
-      const streamInterval = setInterval(() => {
-        if (currentIndex < words.length) {
-          const nextIndex = Math.min(currentIndex + CHUNK_SIZE, words.length);
-          const newWords = words.slice(currentIndex, nextIndex);
-
-          setStreamingWords((prev) => [
-            ...prev,
-            {
-              id: Date.now() + currentIndex,
-              text: newWords.join(" ") + " ",
-            },
-          ]);
-
-          currentIndex = nextIndex;
-        } else {
-          clearInterval(streamInterval);
-          resolve();
-        }
-      }, WORD_DELAY);
-    });
+    const words = text.split(' ');
+    const streamingWords: StreamingWord[] = [];
+    
+    for (let i = 0; i < words.length; i += CHUNK_SIZE) {
+      const chunk = words.slice(i, i + CHUNK_SIZE);
+      chunk.forEach((word, index) => {
+        streamingWords.push({
+          id: i + index,
+          text: word + (i + index < words.length - 1 ? ' ' : '')
+        });
+      });
+      
+      setStreamingWords([...streamingWords]);
+      await new Promise(resolve => setTimeout(resolve, WORD_DELAY));
+    }
+    
+    return streamingWords.map(w => w.text).join('');
   };
 
   const sendMessage = async () => {
-    if (!inputValue.trim() || isStreaming || !chatState.isConnected || !currentSession) return;
+    if (!inputValue.trim() || isStreaming || !chatState.isConnected) return;
 
     const userMessage: Message = {
-      id: `user-${Date.now()}`,
+      id: `msg_${Date.now()}`,
+      type: 'user',
       content: inputValue.trim(),
-      type: "user",
-      newSection: messages.length > 0,
-      role: 'user',
-      timestamp: new Date()
+      timestamp: new Date(),
+      completed: true
     };
 
-    // Add vibration when message is submitted
-    if (navigator.vibrate) {
-      navigator.vibrate(50);
-    }
-
-    // Reset input before starting the AI response
-    setInputValue("");
+    setMessages(prev => [...prev, userMessage]);
+    setInputValue('');
     setHasTyped(false);
-    setActiveButton("none");
-
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-    }
-
-    // Add the message to state and storage
-    setMessages((prev) => [...prev, userMessage]);
-    chatStorage.addMessage(currentSession.id, userMessage);
-
-    // Only focus the textarea on desktop, not on mobile
-    if (!isMobile) {
-      focusTextarea();
-    } else {
-      if (textareaRef.current) {
-        textareaRef.current.blur();
-      }
-    }
-
-    // Start AI response
-    await simulateAIResponse(userMessage.content);
-  };
-
-  const simulateAIResponse = async (userMessage: string) => {
-    const messageId = Date.now().toString();
-    setStreamingMessageId(messageId);
-
-    const aiMessage: Message = {
-      id: messageId,
-      content: "",
-      type: "system",
-      role: 'assistant',
-      timestamp: new Date()
-    };
-
-    setMessages((prev) => [...prev, aiMessage]);
-    if (currentSession) {
-      chatStorage.addMessage(currentSession.id, aiMessage);
-    }
-
-    // Add a delay before the second vibration
-    setTimeout(() => {
-      if (navigator.vibrate) {
-        navigator.vibrate(50);
-      }
-    }, 200);
+    setIsStreaming(true);
 
     try {
-      const response: any = await mcpClient.callTool({
+      const response = await mcpClient.callTool({
         name: 'intelligent_chat',
         arguments: {
           conversationId: chatState.conversationId,
-          message: userMessage
+          message: inputValue.trim()
         }
       });
+      
+      const aiMessage: Message = {
+        id: `msg_${Date.now()}_ai`,
+        type: 'system',
+        content: '',
+        timestamp: new Date(),
+        completed: false,
+        toolCalls: response.result?.data?.functionCalls || []
+      };
 
-      // Handle different response structures
-      let aiResponse = 'No response received';
-      let toolCalls = null;
+      setMessages(prev => [...prev, aiMessage]);
+      setStreamingMessageId(aiMessage.id);
+      setStreamingWords([]);
 
-      // Check for new MCP response structure with content array
-      if (response?.content && Array.isArray(response.content)) {
-        const textContent = response.content.find(item => item.type === 'text');
-        if (textContent?.text) {
+      // Parse the MCP response to extract the actual message content
+      let responseContent = '';
+      let functionCalls = [];
+      console.log(response);
+      
+      // Check if response has content array structure
+      if (response.content && Array.isArray(response.content) && response.content.length > 0) {
+        const firstContent = response.content[0];
+        if (firstContent.type === 'text' && firstContent.text) {
           try {
-            const parsedContent = JSON.parse(textContent.text);
-            if (parsedContent.success && parsedContent.data?.response) {
-              aiResponse = parsedContent.data.response;
-              toolCalls = parsedContent.data.functionCalls;
+            // Parse the text content as JSON
+            const parsedText = JSON.parse(firstContent.text);
+            
+            // Extract the actual response data
+            if (parsedText.data?.response) {
+              responseContent = parsedText.data.response;
+              functionCalls = parsedText.data.functionCalls || [];
+            } else if (typeof parsedText === 'string') {
+              responseContent = parsedText;
+            } else {
+              responseContent = firstContent.text;
             }
-          } catch (e) {
-            // If parsing fails, use the text directly
-            aiResponse = textContent.text;
+          } catch (error) {
+            console.error('Error parsing response text as JSON:', error);
+            responseContent = firstContent.text;
           }
         }
-      } else if (response?.result?.data?.response) {
-        aiResponse = response.result.data.response;
-        toolCalls = response.result.data.functionCalls;
-      } else if (response?.data?.response) {
-        aiResponse = response.data.response;
-        toolCalls = response.data.functionCalls;
-      } else if (typeof response === 'string') {
-        aiResponse = response;
+      } else if (response.result?.data?.response) {
+        // Fallback to the old structure
+        try {
+          // The response might be a JSON string that needs to be parsed
+          const responseData = response.result.data.response;
+          let parsedResponse;
+          
+          // Try to parse as JSON first
+          try {
+            parsedResponse = JSON.parse(responseData);
+          } catch {
+            // If it's not JSON, use the response as-is
+            parsedResponse = { data: { response: responseData } };
+          }
+          
+          // Extract the actual response content
+          if (parsedResponse.data?.response) {
+            responseContent = parsedResponse.data.response;
+            functionCalls = parsedResponse.data.functionCalls || [];
+          } else if (typeof parsedResponse === 'string') {
+            responseContent = parsedResponse;
+          } else {
+            responseContent = responseData;
+          }
+        } catch (error) {
+          console.error('Error parsing MCP response:', error);
+          responseContent = response.result.data.response;
+        }
       }
-
-      // Stream the text
-      await simulateTextStreaming(aiResponse);
-
-      // Update with complete message
-      const updatedMessage = {
-        content: aiResponse,
-        completed: true,
-        toolCalls: toolCalls
-      };
-
-      setMessages((prev) =>
-        prev.map((msg) => 
-          msg.id === messageId 
-            ? { ...msg, ...updatedMessage } 
-            : msg
-        ),
-      );
+      
+      if (responseContent) {
+        const streamedContent = await simulateTextStreaming(responseContent);
+        setMessages(prev => 
+          prev.map(msg => 
+            msg.id === aiMessage.id 
+              ? { ...msg, content: streamedContent, completed: true, toolCalls: functionCalls }
+              : msg
+          )
+        );
+        setCompletedMessages(prev => new Set([...prev, aiMessage.id]));
+      }
 
       if (currentSession) {
-        chatStorage.updateMessage(currentSession.id, messageId, updatedMessage);
+        chatStorage.addMessage(currentSession.id, userMessage);
+        chatStorage.addMessage(currentSession.id, {
+          ...aiMessage,
+          content: responseContent || '',
+          completed: true,
+          toolCalls: functionCalls
+        });
       }
-
-      // Add to completed messages set
-      setCompletedMessages((prev) => new Set(prev).add(messageId));
-
-      // Add vibration when streaming ends
-      if (navigator.vibrate) {
-        navigator.vibrate(50);
-      }
-
     } catch (error) {
       console.error('Error sending message:', error);
-      
-      const errorResponse = 'Sorry, I encountered an error. Please try again.';
-      await simulateTextStreaming(errorResponse);
-
-      const errorMessageUpdate = {
-        content: errorResponse,
+      // Add error message to chat
+      const errorMessage: Message = {
+        id: `msg_${Date.now()}_error`,
+        type: 'system',
+        content: 'Sorry, I encountered an error. Please try again.',
+        timestamp: new Date(),
         completed: true
       };
-
-      setMessages((prev) =>
-        prev.map((msg) => 
-          msg.id === messageId 
-            ? { ...msg, ...errorMessageUpdate } 
-            : msg
-        ),
-      );
-
-      if (currentSession) {
-        chatStorage.updateMessage(currentSession.id, messageId, errorMessageUpdate);
-      }
-
-      setCompletedMessages((prev) => new Set(prev).add(messageId));
-      if (navigator.vibrate) {
-        navigator.vibrate(50);
-      }
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsStreaming(false);
+      setStreamingMessageId(null);
+      setStreamingWords([]);
+      shouldFocusAfterStreamingRef.current = true;
     }
+  };
 
-    // Reset streaming state
+  const simulateAIResponse = async (userMessage: string) => {
+    // Simulate AI response for testing
+    const responses = [
+      "I understand you're asking about DeFi. Let me help you with that!",
+      "That's an interesting question about blockchain technology. Here's what I can tell you...",
+      "I can help you with wallet management, token prices, and more. What specific information do you need?",
+      "Great question! Let me provide you with some insights about the DeFi ecosystem."
+    ];
+    
+    const randomResponse = responses[Math.floor(Math.random() * responses.length)];
+    
+    const aiMessage: Message = {
+      id: `msg_${Date.now()}_ai`,
+      type: 'system',
+      content: '',
+      timestamp: new Date(),
+      completed: false
+    };
+
+    setMessages(prev => [...prev, aiMessage]);
+    setStreamingMessageId(aiMessage.id);
     setStreamingWords([]);
-    setStreamingMessageId(null);
-    setIsStreaming(false);
+
+    // Simulate streaming
+    const streamedContent = await simulateTextStreaming(randomResponse);
+    
+    setMessages(prev => 
+      prev.map(msg => 
+        msg.id === aiMessage.id 
+          ? { ...msg, content: streamedContent, completed: true }
+          : msg
+      )
+    );
+    
+    setCompletedMessages(prev => new Set([...prev, aiMessage.id]));
+    
+    if (currentSession) {
+      chatStorage.addMessage(currentSession.id, aiMessage);
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const newValue = e.target.value;
-
-    if (!isStreaming) {
-      setInputValue(newValue);
-
-      if (newValue.trim() !== "" && !hasTyped) {
-        setHasTyped(true);
-      } else if (newValue.trim() === "" && hasTyped) {
-        setHasTyped(false);
-      }
-
-      const textarea = textareaRef.current;
-      if (textarea) {
-        textarea.style.height = "auto";
-        const newHeight = Math.max(24, Math.min(textarea.scrollHeight, 160));
-        textarea.style.height = `${newHeight}px`;
-      }
+    const value = e.target.value;
+    setInputValue(value);
+    setHasTyped(value.length > 0);
+    
+    // Auto-resize textarea
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 160)}px`;
     }
   };
 
@@ -521,26 +452,14 @@ export default function ChatInterface() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (!isStreaming && e.key === "Enter" && e.metaKey) {
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit(e);
-      return;
-    }
-
-    if (!isStreaming && !isMobile && e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit(e);
+      sendMessage();
     }
   };
 
   const toggleButton = (button: ActiveButton) => {
-    if (!isStreaming) {
-      saveSelectionState();
-      setActiveButton((prev) => (prev === button ? "none" : button));
-      setTimeout(() => {
-        restoreSelectionState();
-      }, 0);
-    }
+    setActiveButton(activeButton === button ? "none" : button);
   };
 
   const clearConversation = () => {
@@ -548,11 +467,11 @@ export default function ChatInterface() {
   };
 
   const shouldApplyHeight = (sectionIndex: number) => {
-    return sectionIndex > 0;
+    return sectionIndex === messageSections.length - 1;
   };
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen overflow-hidden">
       {/* Sidebar */}
       <SessionSidebar
         isOpen={isSidebarOpen}
@@ -563,88 +482,71 @@ export default function ChatInterface() {
         refreshTrigger={sidebarRefreshTrigger}
       />
 
-      {/* Main Chat Interface */}
-      <div
-        ref={mainContainerRef}
-        className="flex-1 flex flex-col overflow-hidden relative"
-        style={{ height: isMobile ? `${viewportHeight}px` : "100svh" }}
-      >
-        <ChatHeader 
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Header */}
+        <ChatHeader
           isConnected={chatState.isConnected}
           onClearConversation={clearConversation}
           onToggleSidebar={handleToggleSidebar}
           onNewSession={handleNewSession}
         />
 
+        {/* Messages Area */}
         <div 
-          ref={chatContainerRef} 
-          className="flex-grow overflow-y-auto px-4"
-          style={{ 
-            paddingTop: '60px', // Account for fixed header
-            paddingBottom: '120px' // Account for input area
-          }}
+          ref={mainContainerRef}
+          className="flex-1 overflow-y-auto relative"
+          style={{ height: getContentHeight() }}
         >
-          <div className="max-w-3xl mx-auto space-y-4">
-            {messageSections.length === 0 && (
-              <WelcomeCard />
-            )}
-
-            {messageSections.map((section, sectionIndex) => (
-              <div
-                key={section.id}
-                ref={sectionIndex === messageSections.length - 1 && section.isNewSection ? newSectionRef : null}
-              >
-                {section.isNewSection && (
-                  <div
-                    style={
-                      section.isActive && shouldApplyHeight(section.sectionIndex)
-                        ? { height: `${getContentHeight()}px` }
-                        : {}
-                    }
-                    className="pt-4 flex flex-col justify-start"
-                  >
-                    <ChatMessages 
-                      messages={section.messages}
-                      streamingMessageId={streamingMessageId}
-                      streamingWords={streamingWords}
-                      completedMessages={completedMessages}
-                    />
-                  </div>
-                )}
-
-                {!section.isNewSection && (
-                  <ChatMessages 
-                    messages={section.messages}
-                    streamingMessageId={streamingMessageId}
-                    streamingWords={streamingWords}
-                    completedMessages={completedMessages}
-                  />
-                )}
+          <div className="h-full flex flex-col">
+            {/* Welcome Card or Messages */}
+            {messages.length === 0 ? (
+              <div className="flex-1 flex items-center justify-center p-6">
+                <div className="w-full max-w-2xl">
+                  <WelcomeCard />
+                </div>
               </div>
-            ))}
-            <div ref={messagesEndRef} />
+            ) : (
+              <div 
+                ref={chatContainerRef}
+                className="flex-1 overflow-y-auto px-4 py-6 space-y-6"
+              >
+                <ChatMessages
+                  messages={messages}
+                  streamingMessageId={streamingMessageId}
+                  streamingWords={streamingWords}
+                  completedMessages={completedMessages}
+                />
+                <div ref={messagesEndRef} />
+              </div>
+            )}
           </div>
         </div>
 
-        <ChatInput
-          inputValue={inputValue}
-          setInputValue={setInputValue}
-          hasTyped={hasTyped}
-          setHasTyped={setHasTyped}
-          activeButton={activeButton}
-          setActiveButton={setActiveButton}
-          isStreaming={isStreaming}
-          isConnected={chatState.isConnected}
-          isMobile={isMobile}
-          textareaRef={textareaRef}
-          inputContainerRef={inputContainerRef}
-          handleInputChange={handleInputChange}
-          handleSubmit={handleSubmit}
-          handleKeyDown={handleKeyDown}
-          handleInputContainerClick={handleInputContainerClick}
-          toggleButton={toggleButton}
-          focusTextarea={focusTextarea}
-        />
+        {/* Input Area */}
+        <div className="border-t border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="p-4">
+            <ChatInput
+              inputValue={inputValue}
+              setInputValue={setInputValue}
+              hasTyped={hasTyped}
+              setHasTyped={setHasTyped}
+              activeButton={activeButton}
+              setActiveButton={setActiveButton}
+              isStreaming={isStreaming}
+              isConnected={chatState.isConnected}
+              isMobile={isMobile}
+              textareaRef={textareaRef}
+              inputContainerRef={inputContainerRef}
+              handleInputChange={handleInputChange}
+              handleSubmit={handleSubmit}
+              handleKeyDown={handleKeyDown}
+              handleInputContainerClick={handleInputContainerClick}
+              toggleButton={toggleButton}
+              focusTextarea={focusTextarea}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );

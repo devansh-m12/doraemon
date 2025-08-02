@@ -1,6 +1,7 @@
-import { RefreshCcw, Copy, Share2, ThumbsUp, ThumbsDown, Bot, User } from "lucide-react";
+import { RefreshCcw, Copy, Share2, ThumbsUp, ThumbsDown, Bot, User, CheckCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
 import MessageTabs from './MessageTabs';
 import { Message } from '@/lib/chat-storage';
 
@@ -25,12 +26,16 @@ export default function ChatMessages({
   const renderMessage = (message: Message) => {
     const isCompleted = completedMessages.has(message.id);
     const isUser = message.type === "user";
+    const isStreaming = message.id === streamingMessageId;
 
     return (
-      <div key={message.id} className={cn("flex flex-col", isUser ? "items-end" : "items-start")}>
-        <div className="flex items-start space-x-3 max-w-[80%]">
+      <div key={message.id} className={cn(
+        "flex flex-col animate-in fade-in-0 slide-in-from-bottom-2 duration-300",
+        isUser ? "items-end" : "items-start"
+      )}>
+        <div className="flex items-start space-x-3 max-w-[85%] md:max-w-[75%]">
           {!isUser && (
-            <Avatar className="w-8 h-8">
+            <Avatar className="w-8 h-8 flex-shrink-0">
               <AvatarImage src="/bot-avatar.png" />
               <AvatarFallback className="bg-primary text-primary-foreground">
                 <Bot className="w-4 h-4" />
@@ -40,37 +45,42 @@ export default function ChatMessages({
           
           <div
             className={cn(
-              "flex-1 px-4 py-2 rounded-2xl",
+              "flex-1 px-4 py-3 rounded-2xl transition-all duration-200",
+              "shadow-sm border",
               isUser 
-                ? "bg-white border border-gray-200 rounded-br-none" 
-                : "text-gray-900 bg-gray-50 border border-gray-100"
+                ? "bg-primary text-primary-foreground border-primary/20" 
+                : "bg-card text-card-foreground border-border/50"
             )}
           >
             {!isUser && message.toolCalls ? (
               <MessageTabs content={message.content} toolCalls={message.toolCalls} />
             ) : (
-              <>
+              <div className="space-y-2">
                 {message.content && (
-                  <span className={!isUser && !isCompleted ? "animate-fade-in" : ""}>
-                    {message.content}
-                  </span>
+                  <div className={cn(
+                    "prose prose-sm max-w-none",
+                    !isUser && !isCompleted && "animate-fade-in"
+                  )}>
+                    <span className="whitespace-pre-wrap">{message.content}</span>
+                  </div>
                 )}
 
-                {message.id === streamingMessageId && (
-                  <span className="inline">
+                {isStreaming && (
+                  <div className="inline-flex items-center space-x-1">
                     {streamingWords.map((word) => (
                       <span key={word.id} className="animate-fade-in inline">
                         {word.text}
                       </span>
                     ))}
-                  </span>
+                    <span className="inline-block w-2 h-4 bg-current animate-pulse ml-1"></span>
+                  </div>
                 )}
-              </>
+              </div>
             )}
           </div>
 
           {isUser && (
-            <Avatar className="w-8 h-8">
+            <Avatar className="w-8 h-8 flex-shrink-0">
               <AvatarImage src="/user-avatar.png" />
               <AvatarFallback className="bg-secondary text-secondary-foreground">
                 <User className="w-4 h-4" />
@@ -81,22 +91,55 @@ export default function ChatMessages({
 
         {/* Message actions */}
         {!isUser && message.completed && (
-          <div className="flex items-center gap-2 px-4 mt-1 mb-2">
-            <button className="text-gray-400 hover:text-gray-600 transition-colors">
-              <RefreshCcw className="h-4 w-4" />
-            </button>
-            <button className="text-gray-400 hover:text-gray-600 transition-colors">
-              <Copy className="h-4 w-4" />
-            </button>
-            <button className="text-gray-400 hover:text-gray-600 transition-colors">
-              <Share2 className="h-4 w-4" />
-            </button>
-            <button className="text-gray-400 hover:text-gray-600 transition-colors">
-              <ThumbsUp className="h-4 w-4" />
-            </button>
-            <button className="text-gray-400 hover:text-gray-600 transition-colors">
-              <ThumbsDown className="h-4 w-4" />
-            </button>
+          <div className="flex items-center gap-1 px-4 mt-2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground transition-colors"
+              title="Regenerate"
+            >
+              <RefreshCcw className="h-3 w-3" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground transition-colors"
+              title="Copy"
+            >
+              <Copy className="h-3 w-3" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground transition-colors"
+              title="Share"
+            >
+              <Share2 className="h-3 w-3" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground transition-colors"
+              title="Like"
+            >
+              <ThumbsUp className="h-3 w-3" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground transition-colors"
+              title="Dislike"
+            >
+              <ThumbsDown className="h-3 w-3" />
+            </Button>
+          </div>
+        )}
+
+        {/* Completion indicator */}
+        {!isUser && isCompleted && (
+          <div className="flex items-center gap-1 px-4 mt-1">
+            <CheckCircle className="h-3 w-3 text-green-500" />
+            <span className="text-xs text-muted-foreground">Completed</span>
           </div>
         )}
       </div>
@@ -104,8 +147,8 @@ export default function ChatMessages({
   };
 
   return (
-    <>
-      {messages.map((message) => renderMessage(message))}
-    </>
+    <div className="space-y-6 group">
+      {messages.map(renderMessage)}
+    </div>
   );
 } 

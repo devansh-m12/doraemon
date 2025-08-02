@@ -46,103 +46,118 @@ export default function ChatInput({
   focusTextarea
 }: ChatInputProps) {
   return (
-    <div className="fixed bottom-0 left-0 right-0 p-4 bg-gray-50">
-      <form onSubmit={handleSubmit} className="max-w-3xl mx-auto">
+    <div className="w-full max-w-4xl mx-auto">
+      <form onSubmit={handleSubmit} className="w-full">
         <div
           ref={inputContainerRef}
           className={cn(
-            "relative w-full rounded-3xl border border-gray-200 bg-white p-3 cursor-text",
-            isStreaming && "opacity-80",
+            "relative w-full rounded-2xl border border-border/50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 p-4 cursor-text transition-all duration-200",
+            "hover:border-border/70 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/20",
+            isStreaming && "opacity-80 pointer-events-none",
             !isConnected && "opacity-50"
           )}
           onClick={handleInputContainerClick}
         >
-          <div className="pb-9">
-            <Textarea
-              ref={textareaRef}
-              placeholder={
-                !isConnected 
-                  ? "Connecting..." 
-                  : isStreaming 
-                  ? "Waiting for response..." 
-                  : "Ask me anything about DeFi, wallets, tokens..."
-              }
-              className="min-h-[24px] max-h-[160px] w-full rounded-3xl border-0 bg-transparent text-gray-900 placeholder:text-gray-400 placeholder:text-base focus-visible:ring-0 focus-visible:ring-offset-0 text-base pl-2 pr-4 pt-0 pb-0 resize-none overflow-y-auto leading-tight"
-              value={inputValue}
-              onChange={handleInputChange}
-              onKeyDown={handleKeyDown}
-              onFocus={() => {
-                if (textareaRef.current) {
-                  textareaRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+          <div className="flex flex-col space-y-3">
+            {/* Textarea */}
+            <div className="flex-1">
+              <Textarea
+                ref={textareaRef}
+                placeholder={
+                  !isConnected 
+                    ? "Connecting..." 
+                    : isStreaming 
+                    ? "Waiting for response..." 
+                    : "Ask me anything about DeFi, wallets, tokens..."
                 }
-              }}
-              disabled={!isConnected || isStreaming}
-            />
-          </div>
+                className={cn(
+                  "min-h-[24px] max-h-[160px] w-full border-0 bg-transparent",
+                  "text-foreground placeholder:text-muted-foreground/60",
+                  "text-base leading-relaxed resize-none overflow-y-auto",
+                  "focus-visible:ring-0 focus-visible:ring-offset-0",
+                  "transition-all duration-200"
+                )}
+                value={inputValue}
+                onChange={handleInputChange}
+                onKeyDown={handleKeyDown}
+                onFocus={() => {
+                  if (textareaRef.current) {
+                    textareaRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+                  }
+                }}
+                disabled={!isConnected || isStreaming}
+              />
+            </div>
 
-          <div className="absolute bottom-3 left-3 right-3">
+            {/* Action Buttons */}
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <Button
                   type="button"
-                  variant="outline"
-                  size="icon"
+                  variant="ghost"
+                  size="sm"
                   className={cn(
-                    "rounded-full h-8 w-8 flex-shrink-0 border-gray-200 p-0 transition-colors",
-                    activeButton === "add" && "bg-gray-100 border-gray-300",
+                    "h-8 w-8 rounded-full transition-all duration-200",
+                    "hover:bg-accent hover:text-accent-foreground",
+                    "border border-border/50 hover:border-border/70",
+                    activeButton === "add" && "bg-accent text-accent-foreground border-accent"
                   )}
                   onClick={() => toggleButton("add")}
                   disabled={isStreaming || !isConnected}
                 >
-                  <Plus className={cn("h-4 w-4 text-gray-500", activeButton === "add" && "text-gray-700")} />
+                  <Plus className="h-4 w-4" />
                   <span className="sr-only">Add</span>
                 </Button>
 
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="ghost"
+                  size="sm"
                   className={cn(
-                    "rounded-full h-8 px-3 flex items-center border-gray-200 gap-1.5 transition-colors",
-                    activeButton === "deepSearch" && "bg-gray-100 border-gray-300",
+                    "h-8 w-8 rounded-full transition-all duration-200",
+                    "hover:bg-accent hover:text-accent-foreground",
+                    "border border-border/50 hover:border-border/70",
+                    activeButton === "deepSearch" && "bg-accent text-accent-foreground border-accent"
                   )}
                   onClick={() => toggleButton("deepSearch")}
                   disabled={isStreaming || !isConnected}
                 >
-                  <Search className={cn("h-4 w-4 text-gray-500", activeButton === "deepSearch" && "text-gray-700")} />
-                  <span className={cn("text-gray-900 text-sm", activeButton === "deepSearch" && "font-medium")}>
-                    DeepSearch
-                  </span>
+                  <Search className="h-4 w-4" />
+                  <span className="sr-only">Deep Search</span>
                 </Button>
 
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="ghost"
+                  size="sm"
                   className={cn(
-                    "rounded-full h-8 px-3 flex items-center border-gray-200 gap-1.5 transition-colors",
-                    activeButton === "think" && "bg-gray-100 border-gray-300",
+                    "h-8 w-8 rounded-full transition-all duration-200",
+                    "hover:bg-accent hover:text-accent-foreground",
+                    "border border-border/50 hover:border-border/70",
+                    activeButton === "think" && "bg-accent text-accent-foreground border-accent"
                   )}
                   onClick={() => toggleButton("think")}
                   disabled={isStreaming || !isConnected}
                 >
-                  <Lightbulb className={cn("h-4 w-4 text-gray-500", activeButton === "think" && "text-gray-700")} />
-                  <span className={cn("text-gray-900 text-sm", activeButton === "think" && "font-medium")}>
-                    Think
-                  </span>
+                  <Lightbulb className="h-4 w-4" />
+                  <span className="sr-only">Think</span>
                 </Button>
               </div>
 
+              {/* Send Button */}
               <Button
                 type="submit"
-                variant="outline"
-                size="icon"
+                size="sm"
                 className={cn(
-                  "rounded-full h-8 w-8 border-0 flex-shrink-0 transition-all duration-200",
-                  hasTyped ? "bg-black scale-110" : "bg-gray-200",
+                  "h-8 w-8 rounded-full transition-all duration-200",
+                  "bg-primary hover:bg-primary/90 text-primary-foreground",
+                  "disabled:opacity-50 disabled:cursor-not-allowed",
+                  hasTyped && !isStreaming && "animate-pulse"
                 )}
-                disabled={!inputValue.trim() || isStreaming || !isConnected}
+                disabled={!hasTyped || isStreaming || !isConnected}
               >
-                <ArrowUp className={cn("h-4 w-4 transition-colors", hasTyped ? "text-white" : "text-gray-500")} />
-                <span className="sr-only">Submit</span>
+                <ArrowUp className="h-4 w-4" />
+                <span className="sr-only">Send Message</span>
               </Button>
             </div>
           </div>
