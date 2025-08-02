@@ -46,15 +46,17 @@ export default function ChatInput({
   focusTextarea
 }: ChatInputProps) {
   return (
-    <div className="w-full max-w-4xl mx-auto">
+    <div className="w-full max-w-2xl mx-auto animate-in fade-in duration-500">
       <form onSubmit={handleSubmit} className="w-full">
         <div
           ref={inputContainerRef}
           className={cn(
             "relative w-full rounded-2xl border border-border/50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 p-4 cursor-text transition-all duration-200",
             "hover:border-border/70 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/20",
+            "dark:bg-background/98 dark:border-border/60 dark:hover:border-border/80 dark:focus-within:border-primary/60 dark:focus-within:ring-primary/30",
             isStreaming && "opacity-80 pointer-events-none",
-            !isConnected && "opacity-50"
+            !isConnected && "opacity-50",
+            "shadow-lg hover:shadow-xl"
           )}
           onClick={handleInputContainerClick}
         >
@@ -68,14 +70,15 @@ export default function ChatInput({
                     ? "Connecting..." 
                     : isStreaming 
                     ? "Waiting for response..." 
-                    : "Ask me anything about DeFi, wallets, tokens..."
+                    : "Message Doraemon..."
                 }
                 className={cn(
                   "min-h-[24px] max-h-[160px] w-full border-0 bg-transparent",
                   "text-foreground placeholder:text-muted-foreground/60",
                   "text-base leading-relaxed resize-none overflow-y-auto",
                   "focus-visible:ring-0 focus-visible:ring-offset-0",
-                  "transition-all duration-200"
+                  "transition-all duration-200",
+                  "dark:text-foreground dark:placeholder:text-muted-foreground/70"
                 )}
                 value={inputValue}
                 onChange={handleInputChange}
@@ -99,16 +102,14 @@ export default function ChatInput({
                   className={cn(
                     "h-8 w-8 rounded-full transition-all duration-200",
                     "hover:bg-accent hover:text-accent-foreground",
-                    "border border-border/50 hover:border-border/70",
-                    activeButton === "add" && "bg-accent text-accent-foreground border-accent"
+                    "dark:hover:bg-accent/80 dark:hover:text-accent-foreground",
+                    activeButton === "add" && "bg-primary text-primary-foreground dark:bg-primary/90 dark:text-primary-foreground"
                   )}
                   onClick={() => toggleButton("add")}
-                  disabled={isStreaming || !isConnected}
+                  title="Add context"
                 >
                   <Plus className="h-4 w-4" />
-                  <span className="sr-only">Add</span>
                 </Button>
-
                 <Button
                   type="button"
                   variant="ghost"
@@ -116,16 +117,14 @@ export default function ChatInput({
                   className={cn(
                     "h-8 w-8 rounded-full transition-all duration-200",
                     "hover:bg-accent hover:text-accent-foreground",
-                    "border border-border/50 hover:border-border/70",
-                    activeButton === "deepSearch" && "bg-accent text-accent-foreground border-accent"
+                    "dark:hover:bg-accent/80 dark:hover:text-accent-foreground",
+                    activeButton === "deepSearch" && "bg-primary text-primary-foreground dark:bg-primary/90 dark:text-primary-foreground"
                   )}
                   onClick={() => toggleButton("deepSearch")}
-                  disabled={isStreaming || !isConnected}
+                  title="Deep search"
                 >
                   <Search className="h-4 w-4" />
-                  <span className="sr-only">Deep Search</span>
                 </Button>
-
                 <Button
                   type="button"
                   variant="ghost"
@@ -133,31 +132,31 @@ export default function ChatInput({
                   className={cn(
                     "h-8 w-8 rounded-full transition-all duration-200",
                     "hover:bg-accent hover:text-accent-foreground",
-                    "border border-border/50 hover:border-border/70",
-                    activeButton === "think" && "bg-accent text-accent-foreground border-accent"
+                    "dark:hover:bg-accent/80 dark:hover:text-accent-foreground",
+                    activeButton === "think" && "bg-primary text-primary-foreground dark:bg-primary/90 dark:text-primary-foreground"
                   )}
                   onClick={() => toggleButton("think")}
-                  disabled={isStreaming || !isConnected}
+                  title="Think step by step"
                 >
                   <Lightbulb className="h-4 w-4" />
-                  <span className="sr-only">Think</span>
                 </Button>
               </div>
 
-              {/* Send Button */}
+              {/* Submit Button */}
               <Button
                 type="submit"
                 size="sm"
+                disabled={!isConnected || isStreaming || !inputValue.trim()}
                 className={cn(
-                  "h-8 w-8 rounded-full transition-all duration-200",
-                  "bg-primary hover:bg-primary/90 text-primary-foreground",
+                  "h-8 px-4 rounded-full transition-all duration-200",
+                  "bg-primary text-primary-foreground hover:bg-primary/90",
+                  "dark:bg-primary/90 dark:text-primary-foreground dark:hover:bg-primary",
                   "disabled:opacity-50 disabled:cursor-not-allowed",
-                  hasTyped && !isStreaming && "animate-pulse"
+                  "flex items-center gap-2"
                 )}
-                disabled={!hasTyped || isStreaming || !isConnected}
               >
                 <ArrowUp className="h-4 w-4" />
-                <span className="sr-only">Send Message</span>
+                <span className="hidden sm:inline">Send</span>
               </Button>
             </div>
           </div>

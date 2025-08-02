@@ -18,13 +18,13 @@ export default function ChatHeader({
   onNewSession 
 }: ChatHeaderProps) {
   return (
-    <header className="sticky top-0 z-30 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-30 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:bg-background/98 dark:border-border/60 dark:backdrop-blur-md">
       <div className="flex h-14 items-center gap-4 px-4 md:px-6 lg:px-8">
         {/* Sidebar Toggle */}
         <Button 
           variant="ghost" 
           size="icon" 
-          className="h-9 w-9 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
+          className="h-9 w-9 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 dark:hover:bg-accent/80 dark:hover:text-accent-foreground"
           onClick={onToggleSidebar}
         >
           <Menu className="h-4 w-4" />
@@ -34,16 +34,18 @@ export default function ChatHeader({
         {/* Brand & Status */}
         <div className="flex items-center gap-3 flex-1">
           <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/80 shadow-sm">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/80 shadow-sm dark:from-primary/90 dark:to-primary/70 dark:shadow-primary/20">
               <Zap className="h-4 w-4 text-primary-foreground" />
             </div>
             <div className="flex items-center gap-2">
-              <h1 className="text-lg font-semibold text-foreground hidden sm:block">Doraemon</h1>
+              <h1 className="text-lg font-semibold text-foreground hidden sm:block dark:text-foreground">Doraemon</h1>
               <Badge 
                 variant={isConnected ? 'default' : 'destructive'} 
                 className={cn(
                   "text-xs font-medium px-2 py-0.5 transition-all duration-200",
-                  isConnected ? "bg-green-500/10 text-green-600 border-green-500/20" : "bg-red-500/10 text-red-600 border-red-500/20"
+                  isConnected 
+                    ? "bg-green-500/10 text-green-600 border-green-500/20 dark:bg-green-500/20 dark:text-green-400 dark:border-green-500/30" 
+                    : "bg-red-500/10 text-red-600 border-red-500/20 dark:bg-red-500/20 dark:text-red-400 dark:border-red-500/30"
                 )}
               >
                 {isConnected ? 'Live' : 'Offline'}
@@ -57,7 +59,7 @@ export default function ChatHeader({
           <Button 
             variant="ghost" 
             size="icon" 
-            className="h-9 w-9 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
+            className="h-9 w-9 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 dark:hover:bg-accent/80 dark:hover:text-accent-foreground"
             onClick={onNewSession}
             title="New Chat"
           >
@@ -67,7 +69,7 @@ export default function ChatHeader({
           <Button 
             variant="ghost" 
             size="icon" 
-            className="h-9 w-9 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
+            className="h-9 w-9 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 dark:hover:bg-accent/80 dark:hover:text-accent-foreground"
             onClick={onClearConversation}
             title="Clear Chat"
           >
@@ -77,7 +79,7 @@ export default function ChatHeader({
           <Button 
             variant="ghost" 
             size="icon" 
-            className="h-9 w-9 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
+            className="h-9 w-9 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 dark:hover:bg-accent/80 dark:hover:text-accent-foreground"
             title="Settings"
           >
             <Settings className="h-4 w-4" />

@@ -25,6 +25,10 @@ export default function StatusIndicator({
       textColor: 'text-green-600',
       bgColor: 'bg-green-50',
       borderColor: 'border-green-200',
+      darkColor: 'dark:bg-green-400',
+      darkTextColor: 'dark:text-green-400',
+      darkBgColor: 'dark:bg-green-500/10',
+      darkBorderColor: 'dark:border-green-500/20',
       text: 'Connected'
     },
     disconnected: {
@@ -33,6 +37,10 @@ export default function StatusIndicator({
       textColor: 'text-gray-600',
       bgColor: 'bg-gray-50',
       borderColor: 'border-gray-200',
+      darkColor: 'dark:bg-gray-400',
+      darkTextColor: 'dark:text-gray-400',
+      darkBgColor: 'dark:bg-gray-500/10',
+      darkBorderColor: 'dark:border-gray-500/20',
       text: 'Disconnected'
     },
     connecting: {
@@ -41,6 +49,10 @@ export default function StatusIndicator({
       textColor: 'text-blue-600',
       bgColor: 'bg-blue-50',
       borderColor: 'border-blue-200',
+      darkColor: 'dark:bg-blue-400',
+      darkTextColor: 'dark:text-blue-400',
+      darkBgColor: 'dark:bg-blue-500/10',
+      darkBorderColor: 'dark:border-blue-500/20',
       text: 'Connecting'
     },
     error: {
@@ -49,6 +61,10 @@ export default function StatusIndicator({
       textColor: 'text-red-600',
       bgColor: 'bg-red-50',
       borderColor: 'border-red-200',
+      darkColor: 'dark:bg-red-400',
+      darkTextColor: 'dark:text-red-400',
+      darkBgColor: 'dark:bg-red-500/10',
+      darkBorderColor: 'dark:border-red-500/20',
       text: 'Error'
     }
   };
@@ -68,20 +84,24 @@ export default function StatusIndicator({
       sizeClasses[size],
       config.bgColor,
       config.borderColor,
+      config.darkBgColor,
+      config.darkBorderColor,
       "border rounded-full",
       className
     )}>
       <div className={cn(
         "w-2 h-2 rounded-full",
         config.color,
+        config.darkColor,
         status === 'connecting' && "animate-pulse"
       )} />
       <Icon className={cn(
         "w-3 h-3",
         config.textColor,
+        config.darkTextColor,
         status === 'connecting' && "animate-spin"
       )} />
-      <span className={cn("font-medium", config.textColor)}>
+      <span className={cn("font-medium", config.textColor, config.darkTextColor)}>
         {message || config.text}
       </span>
     </div>

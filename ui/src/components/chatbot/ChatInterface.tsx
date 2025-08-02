@@ -7,7 +7,6 @@ import { chatStorage, ChatSession, Message } from '../../lib/chat-storage';
 import ChatHeader from './ChatHeader';
 import ChatMessages from './ChatMessages';
 import ChatInput from './ChatInput';
-import WelcomeCard from './WelcomeCard';
 import SessionSidebar from './SessionSidebar';
 import ChatContainer from './ChatContainer';
 import { cn } from '@/lib/utils';
@@ -483,7 +482,7 @@ export default function ChatInterface() {
       />
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex flex-col w-full">
         {/* Header */}
         <ChatHeader
           isConnected={chatState.isConnected}
@@ -492,40 +491,10 @@ export default function ChatInterface() {
           onNewSession={handleNewSession}
         />
 
-        {/* Messages Area */}
-        <div 
-          ref={mainContainerRef}
-          className="flex-1 overflow-y-auto relative"
-          style={{ height: getContentHeight() }}
-        >
-          <div className="h-full flex flex-col">
-            {/* Welcome Card or Messages */}
-            {messages.length === 0 ? (
-              <div className="flex-1 flex items-center justify-center p-6">
-                <div className="w-full max-w-2xl">
-                  <WelcomeCard />
-                </div>
-              </div>
-            ) : (
-              <div 
-                ref={chatContainerRef}
-                className="flex-1 overflow-y-auto px-4 py-6 space-y-6"
-              >
-                <ChatMessages
-                  messages={messages}
-                  streamingMessageId={streamingMessageId}
-                  streamingWords={streamingWords}
-                  completedMessages={completedMessages}
-                />
-                <div ref={messagesEndRef} />
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Input Area */}
-        <div className="border-t border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="p-4">
+        {/* Main Content Area */}
+        {messages.length === 0 ? (
+          /* Centered Input when no messages */
+          <div className="flex-1 flex items-center justify-center mx-auto">
             <ChatInput
               inputValue={inputValue}
               setInputValue={setInputValue}
@@ -546,7 +515,57 @@ export default function ChatInterface() {
               focusTextarea={focusTextarea}
             />
           </div>
-        </div>
+        ) : (
+          /* Messages and Input at bottom when messages exist */
+          <>
+            {/* Messages Area */}
+            <div 
+              ref={mainContainerRef}
+              className="w-3/4 mx-auto overflow-y-auto relative no-scrollbar"
+              style={{ height: getContentHeight() }}
+            >
+              <div className="h-full flex flex-col">
+                <div 
+                  ref={chatContainerRef}
+                  className="flex-1 overflow-y-auto px-4 py-6 space-y-6 no-scrollbar"
+                >
+                  <ChatMessages
+                    messages={messages}
+                    streamingMessageId={streamingMessageId}
+                    streamingWords={streamingWords}
+                    completedMessages={completedMessages}
+                  />
+                  <div ref={messagesEndRef} />
+                </div>
+              </div>
+            </div>
+
+            {/* Input Area */}
+            <div className="border-t border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:border-border/60 dark:bg-background/98 dark:backdrop-blur-md">
+              <div className="p-4">
+                <ChatInput
+                  inputValue={inputValue}
+                  setInputValue={setInputValue}
+                  hasTyped={hasTyped}
+                  setHasTyped={setHasTyped}
+                  activeButton={activeButton}
+                  setActiveButton={setActiveButton}
+                  isStreaming={isStreaming}
+                  isConnected={chatState.isConnected}
+                  isMobile={isMobile}
+                  textareaRef={textareaRef}
+                  inputContainerRef={inputContainerRef}
+                  handleInputChange={handleInputChange}
+                  handleSubmit={handleSubmit}
+                  handleKeyDown={handleKeyDown}
+                  handleInputContainerClick={handleInputContainerClick}
+                  toggleButton={toggleButton}
+                  focusTextarea={focusTextarea}
+                />
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

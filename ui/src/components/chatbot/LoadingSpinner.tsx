@@ -23,6 +23,7 @@ export default function LoadingSpinner({ size = 'md', className }: LoadingSpinne
       <div className={cn(
         "animate-spin rounded-full border-2 border-muted",
         "border-t-primary",
+        "dark:border-muted/50 dark:border-t-primary/90",
         sizeClasses[size]
       )} />
     </div>
@@ -32,9 +33,9 @@ export default function LoadingSpinner({ size = 'md', className }: LoadingSpinne
 export function LoadingDots({ className }: { className?: string }) {
   return (
     <div className={cn("flex space-x-1", className)}>
-      <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-      <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-      <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+      <div className="w-2 h-2 bg-primary rounded-full animate-bounce dark:bg-primary/90" style={{ animationDelay: '0ms' }} />
+      <div className="w-2 h-2 bg-primary rounded-full animate-bounce dark:bg-primary/90" style={{ animationDelay: '150ms' }} />
+      <div className="w-2 h-2 bg-primary rounded-full animate-bounce dark:bg-primary/90" style={{ animationDelay: '300ms' }} />
     </div>
   );
 }
@@ -45,9 +46,9 @@ export function LoadingPulse({ className }: { className?: string }) {
       "flex space-x-2",
       className
     )}>
-      <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
-      <div className="w-2 h-2 bg-primary rounded-full animate-pulse" style={{ animationDelay: '200ms' }} />
-      <div className="w-2 h-2 bg-primary rounded-full animate-pulse" style={{ animationDelay: '400ms' }} />
+      <div className="w-2 h-2 bg-primary rounded-full animate-pulse dark:bg-primary/90" />
+      <div className="w-2 h-2 bg-primary rounded-full animate-pulse dark:bg-primary/90" style={{ animationDelay: '200ms' }} />
+      <div className="w-2 h-2 bg-primary rounded-full animate-pulse dark:bg-primary/90" style={{ animationDelay: '400ms' }} />
     </div>
   );
 } 

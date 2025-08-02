@@ -41,23 +41,23 @@ export default class ErrorBoundary extends Component<Props, State> {
 
       return (
         <div className="flex items-center justify-center min-h-[400px] p-6">
-          <Card className="max-w-md w-full border-destructive/50 bg-destructive/5">
+          <Card className="max-w-md w-full border-destructive/50 bg-destructive/5 dark:bg-destructive/10 dark:border-destructive/60">
             <CardHeader className="text-center">
-              <div className="mx-auto w-12 h-12 bg-destructive/10 rounded-full flex items-center justify-center mb-4">
+              <div className="mx-auto w-12 h-12 bg-destructive/10 rounded-full flex items-center justify-center mb-4 dark:bg-destructive/20">
                 <AlertTriangle className="w-6 h-6 text-destructive" />
               </div>
-              <CardTitle className="text-destructive">Something went wrong</CardTitle>
+              <CardTitle className="text-destructive dark:text-destructive">Something went wrong</CardTitle>
             </CardHeader>
             <CardContent className="text-center space-y-4">
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground dark:text-muted-foreground/80">
                 An unexpected error occurred. Please try refreshing the page or contact support if the problem persists.
               </p>
               {this.state.error && (
-                <details className="text-xs text-muted-foreground">
-                  <summary className="cursor-pointer hover:text-foreground">
+                <details className="text-xs text-muted-foreground dark:text-muted-foreground/80">
+                  <summary className="cursor-pointer hover:text-foreground dark:hover:text-foreground">
                     Error details
                   </summary>
-                  <pre className="mt-2 p-2 bg-muted rounded text-left overflow-auto">
+                  <pre className="mt-2 p-2 bg-muted rounded text-left overflow-auto dark:bg-muted/50 dark:text-muted-foreground">
                     {this.state.error.message}
                   </pre>
                 </details>

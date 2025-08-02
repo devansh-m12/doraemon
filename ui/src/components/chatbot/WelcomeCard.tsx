@@ -28,25 +28,25 @@ export default function WelcomeCard() {
   ];
 
   return (
-    <Card className="border-dashed border-border/50 bg-gradient-to-br from-background to-muted/20 backdrop-blur-sm hover:border-border/70 transition-all duration-300">
+    <Card className="border-dashed border-border/50 bg-gradient-to-br from-background to-muted/20 backdrop-blur-sm hover:border-border/70 transition-all duration-300 dark:border-border/60 dark:from-background dark:to-muted/10 dark:hover:border-border/80">
       <CardContent className="pt-8 pb-6">
         <div className="text-center space-y-8">
           {/* Header */}
           <div className="relative">
-            <div className="w-20 h-20 bg-gradient-to-br from-primary/10 to-accent/10 rounded-2xl flex items-center justify-center mx-auto shadow-lg hover:shadow-xl transition-all duration-300">
-              <MessageCircle className="w-10 h-10 text-primary" />
+            <div className="w-20 h-20 bg-gradient-to-br from-primary/10 to-accent/10 rounded-2xl flex items-center justify-center mx-auto shadow-lg hover:shadow-xl transition-all duration-300 dark:from-primary/20 dark:to-accent/20">
+              <MessageCircle className="w-10 h-10 text-primary dark:text-primary/90" />
             </div>
-            <div className="absolute -top-1 -right-1 w-6 h-6 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center animate-pulse">
+            <div className="absolute -top-1 -right-1 w-6 h-6 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center animate-pulse dark:from-primary/90 dark:to-accent/90">
               <div className="w-2 h-2 bg-white rounded-full"></div>
             </div>
           </div>
           
           {/* Title */}
           <div className="space-y-3">
-            <h3 className="text-3xl font-bold text-foreground bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text">
+            <h3 className="text-3xl font-bold text-foreground bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text dark:from-foreground dark:to-foreground/80">
               Welcome to Doraemon!
             </h3>
-            <p className="text-base text-muted-foreground max-w-md mx-auto leading-relaxed">
+            <p className="text-base text-muted-foreground dark:text-muted-foreground/80 max-w-md mx-auto leading-relaxed">
               Your intelligent AI assistant for all things DeFi and blockchain. 
               Ask me anything about tokens, wallets, or trading strategies.
             </p>
@@ -57,16 +57,16 @@ export default function WelcomeCard() {
             {features.map((feature, index) => (
               <div 
                 key={index}
-                className="flex items-start gap-3 p-4 rounded-xl bg-muted/50 hover:bg-muted/70 transition-all duration-200 cursor-pointer group"
+                className="flex items-start gap-3 p-4 rounded-xl bg-muted/50 hover:bg-muted/70 transition-all duration-200 cursor-pointer group dark:bg-muted/30 dark:hover:bg-muted/50"
               >
-                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                  <feature.icon className="w-5 h-5 text-primary" />
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors dark:bg-primary/20 dark:group-hover:bg-primary/30">
+                  <feature.icon className="w-5 h-5 text-primary dark:text-primary/90" />
                 </div>
                 <div className="flex-1 text-left">
-                  <h4 className="font-medium text-foreground group-hover:text-primary transition-colors">
+                  <h4 className="font-medium text-foreground group-hover:text-primary transition-colors dark:text-foreground dark:group-hover:text-primary/90">
                     {feature.title}
                   </h4>
-                  <p className="text-sm text-muted-foreground mt-1">
+                  <p className="text-sm text-muted-foreground dark:text-muted-foreground/80 mt-1">
                     {feature.description}
                   </p>
                 </div>
@@ -79,7 +79,7 @@ export default function WelcomeCard() {
             <Button 
               variant="default" 
               size="lg"
-              className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 transition-all duration-200"
+              className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 transition-all duration-200 dark:from-primary/90 dark:to-primary/80 dark:hover:from-primary dark:hover:to-primary/90"
             >
               <Sparkles className="w-4 h-4 mr-2" />
               Start Chatting
@@ -87,7 +87,7 @@ export default function WelcomeCard() {
             <Button 
               variant="outline" 
               size="lg"
-              className="border-border/50 hover:border-border transition-all duration-200"
+              className="border-border/50 hover:border-border transition-all duration-200 dark:border-border/60 dark:hover:border-border/80"
             >
               View Examples
             </Button>
@@ -95,7 +95,7 @@ export default function WelcomeCard() {
           
           {/* Footer */}
           <div className="pt-6">
-            <p className="text-xs text-muted-foreground/70 max-w-sm mx-auto">
+            <p className="text-xs text-muted-foreground/70 dark:text-muted-foreground/60 max-w-sm mx-auto">
               Start by asking me anything about DeFi, tokens, or blockchain! 
               I'm here to help you navigate the world of decentralized finance.
             </p>

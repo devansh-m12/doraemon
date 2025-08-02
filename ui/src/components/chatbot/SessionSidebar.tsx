@@ -104,48 +104,168 @@ export default function SessionSidebar({
 
   const formatDate = (date: Date) => {
     const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
     
-    if (days === 0) {
-      return 'Today';
-    } else if (days === 1) {
-      return 'Yesterday';
-    } else if (days < 7) {
-      return `${days} days ago`;
+    if (diffInHours < 1) {
+      return 'Just now';
+    } else if (diffInHours < 24) {
+      return `${diffInHours}h ago`;
     } else {
-      return date.toLocaleDateString();
+      const diffInDays = Math.floor(diffInHours / 24);
+      return `${diffInDays}d ago`;
     }
   };
 
   const truncateTitle = (title: string, maxLength: number = 30) => {
-    return title.length > maxLength ? title.slice(0, maxLength) + '...' : title;
+    if (title.length <= maxLength) return title;
+    return title.substring(0, maxLength) + '...';
   };
 
-  const sessionsCount = sessions.length;
+  if (!isOpen) return null;
 
   return (
     <>
       {/* Backdrop */}
-      {isOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
-          onClick={onClose}
-        />
-      )}
+      <div 
+        className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 lg:hidden"
+        onClick={onClose}
+      />
+      
+      {/* Sidebar */}
+      <div className={cn(
+        "fixed left-0 top-0 z-50 h-full w-80 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60",
+        "border-r border-border/50 shadow-xl",
+        "dark:bg-background/98 dark:border-border/60 dark:shadow-2xl dark:shadow-black/20",
+        "transform transition-transform duration-300 ease-in-out",
+        isOpen ? "translate-x-0" : "-translate-x-full"
+      )}>
+        {/* Header */}
+        <div className="flex h-14 items-center justify-between border-b border-border/40 px-4 dark:border-border/60">
+          <h2 className="text-lg font-semibold text-foreground dark:text-foreground">Chat History</h2>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            className="h-8 w-8 rounded-lg hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/80 dark:hover:text-accent-foreground"
+          >
+            <X className="h-4 w-4" />
+            <span className="sr-only">Close sidebar</span>
+          </Button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto no-scrollbar">
+          {/* New Session Button */}
+          <div className="p-4 border-b border-border/40 dark:border-border/60">
+            <Button
+              onClick={handleNewSession}
+              className="w-full bg-primary text-primary-foreground hover:bg-primary/90 dark:bg-primary/90 dark:hover:bg-primary"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              New Chat
+            </Button>
+          </div>
+
+          {/* Sessions List */}
+          <div className="p-4 space-y-2">
+            {sessions.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground dark:text-muted-foreground/80">
+                <MessageSquare className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50 dark:text-muted-foreground/30" />
+                <p className="text-sm">No chat history</p>
+                <p className="text-xs">Start a new conversation to see it here</p>
+              </div>
+            ) : (
+              sessions.map((session) => (
+                <div
+                  key={session.id}
+                  className={cn(
+                    "group relative rounded-lg border border-border/50 p-3 cursor-pointer transition-all duration-200",
+                    "hover:bg-accent/50 hover:border-border/70",
+                    "dark:border-border/60 dark:hover:bg-accent/30 dark:hover:border-border/80",
+                    session.id === currentSessionId && "bg-accent/50 border-primary/50 dark:bg-accent/30 dark:border-primary/60"
+                  )}
+                  onClick={() => onSessionSelect(session)}
+                >
+                  {/* Session Content */}
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <MessageSquare className="h-4 w-4 text-muted-foreground dark:text-muted-foreground/80" />
+                        <h3 className="text-sm font-medium text-foreground dark:text-foreground truncate">
+                          {truncateTitle(session.title || 'Untitled Chat')}
+                        </h3>
+                        {session.id === currentSessionId && (
+                          <Badge variant="secondary" className="text-xs px-1.5 py-0.5 bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary">
+                            Current
+                          </Badge>
+                        )}
+                      </div>
+                      
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground dark:text-muted-foreground/80">
+                        <Clock className="h-3 w-3" />
+                        <span>{formatDate(session.createdAt)}</span>
+                        {session.messages.length > 0 && (
+                          <>
+                            <span>•</span>
+                            <span>{session.messages.length} messages</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive dark:text-muted-foreground/80 dark:hover:text-destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          confirmDeleteSession(session.id);
+                        }}
+                        title="Delete session"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        {sessions.length > 1 && (
+          <div className="border-t border-border/40 p-4 dark:border-border/60">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleClearAllSessions}
+              className="w-full text-destructive hover:text-destructive dark:text-destructive dark:hover:text-destructive"
+            >
+              <AlertTriangle className="h-4 w-4 mr-2" />
+              Clear All History
+            </Button>
+          </div>
+        )}
+      </div>
 
       {/* Delete Confirmation Modal */}
       {sessionToDelete && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-background rounded-lg p-6 max-w-sm w-full border border-border/50 shadow-lg">
-            <div className="flex items-center mb-4">
-              <AlertTriangle className="h-5 w-5 text-red-500 mr-2" />
-              <h3 className="text-lg font-semibold">Delete Session</h3>
+          <div className="bg-background dark:bg-background/95 rounded-lg border border-border/50 dark:border-border/60 p-6 max-w-sm w-full shadow-xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-destructive/10 rounded-full flex items-center justify-center">
+                <AlertTriangle className="w-5 h-5 text-destructive" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-foreground dark:text-foreground">Delete Session</h3>
+                <p className="text-sm text-muted-foreground dark:text-muted-foreground/80">This action cannot be undone.</p>
+              </div>
             </div>
-            <p className="text-muted-foreground mb-6">
-              Are you sure you want to delete this chat session? This action cannot be undone.
-            </p>
-            <div className="flex space-x-3">
+            
+            <div className="flex gap-3">
               <Button
                 variant="outline"
                 onClick={() => setSessionToDelete(null)}
@@ -164,135 +284,6 @@ export default function SessionSidebar({
           </div>
         </div>
       )}
-
-      {/* Sidebar */}
-      <div className={cn(
-        "fixed top-0 left-0 h-full w-80 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-r border-border/40 z-50",
-        "transform transition-transform duration-300 ease-in-out",
-        isOpen ? 'translate-x-0' : '-translate-x-full',
-        "lg:relative lg:translate-x-0 lg:z-0 lg:border-r-0"
-      )}>
-        <div className="flex flex-col h-full">
-          {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-border/40 bg-muted/20">
-            <div className="flex items-center space-x-2">
-              <h2 className="text-lg font-semibold text-foreground">Chat Sessions</h2>
-              <Badge variant="secondary" className="text-xs">
-                {sessionsCount}
-              </Badge>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleNewSession}
-                className="h-8 w-8 hover:bg-accent hover:text-accent-foreground transition-colors"
-                title="New Chat"
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-              {sessionsCount > 1 && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleClearAllSessions}
-                  className="h-8 w-8 hover:bg-red-100 text-red-600 transition-colors"
-                  title="Clear All Sessions"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              )}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onClose}
-                className="h-8 w-8 lg:hidden hover:bg-accent hover:text-accent-foreground transition-colors"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-
-          {/* Sessions List */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-2">
-            {sessions.length === 0 ? (
-              <div className="text-center py-8">
-                <MessageSquare className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
-                <p className="text-muted-foreground">No chat sessions yet</p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleNewSession}
-                  className="mt-4"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Start New Chat
-                </Button>
-              </div>
-            ) : (
-              sessions.map((session) => (
-                <div
-                  key={session.id}
-                  className={cn(
-                    "group relative p-3 rounded-lg border border-border/50 bg-card hover:bg-accent/50 transition-all duration-200 cursor-pointer",
-                    session.id === currentSessionId && "bg-accent border-accent/50 shadow-sm"
-                  )}
-                  onClick={() => onSessionSelect(session)}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <MessageSquare className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                        <h3 className="font-medium text-sm text-foreground truncate">
-                          {truncateTitle(session.title)}
-                        </h3>
-                        {session.id === currentSessionId && (
-                          <Badge variant="default" className="text-xs px-1.5 py-0">
-                            Active
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Clock className="h-3 w-3" />
-                        <span>{formatDate(session.updatedAt)}</span>
-                        <span>•</span>
-                        <span>{session.messages.length} messages</span>
-                      </div>
-                    </div>
-                    
-                    {/* Action Menu */}
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 hover:bg-destructive/10 hover:text-destructive"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          confirmDeleteSession(session.id);
-                        }}
-                        title="Delete Session"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-
-          {/* Footer */}
-          <div className="p-4 border-t border-border/40 bg-muted/20">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>Doraemon AI</span>
-              <div className="flex items-center gap-1">
-                <Sparkles className="h-3 w-3" />
-                <span>Powered by AI</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
     </>
   );
 } 

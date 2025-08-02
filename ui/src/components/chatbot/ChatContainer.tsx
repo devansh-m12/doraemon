@@ -15,38 +15,40 @@ export default function ChatContainer({
   variant = 'default' 
 }: ChatContainerProps) {
   const containerClasses = cn(
-    // Base styles
+    // Base styles with improved dark mode boundaries
     "relative flex flex-col",
-    "w-full h-full",
-    "bg-background/90 backdrop-blur-sm",
-    "border border-primary/30",
+    "w-3/4 h-full mx-auto",
+    "bg-background/95 backdrop-blur-sm",
+    "border border-border/50",
     "rounded-lg shadow-lg",
     "overflow-hidden",
+    "dark:bg-background/98 dark:border-border/60",
+    "dark:shadow-2xl dark:shadow-black/20",
     
     // Variant-specific styles
-    variant === 'compact' && "max-w-4xl mx-auto",
-    variant === 'full' && "w-full h-full",
-    variant === 'default' && "max-w-6xl mx-auto",
     
-    // Responsive design
-    "sm:mx-4 md:mx-8 lg:mx-auto",
+    
+    // Responsive design with reduced padding for better centering
+    "sm:mx-auto md:mx-auto lg:mx-auto",
     "sm:my-4 md:my-8",
+    "p-2 sm:p-4 md:p-6",
     
-    // Glass morphism effect with yellow tint
+    // Enhanced glass morphism effect with proper dark mode
     "before:absolute before:inset-0",
     "before:bg-gradient-to-br before:from-primary/5 before:to-transparent",
     "before:rounded-lg before:pointer-events-none",
+    "dark:before:from-primary/10 dark:before:to-primary/5",
     
     className
   );
 
   return (
     <div className={containerClasses}>
-      {/* Subtle inner glow with yellow tint */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-accent/10 rounded-lg pointer-events-none" />
+      {/* Enhanced inner glow with proper dark mode */}
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-accent/10 rounded-lg pointer-events-none dark:from-primary/20 dark:to-accent/20" />
       
-      {/* Content */}
-      <div className="relative z-10 flex-1 flex flex-col">
+      {/* Content with improved dark mode boundaries and reduced padding */}
+      <div className="relative z-10 flex-1 flex flex-col bg-transparent dark:bg-transparent">
         {children}
       </div>
     </div>

@@ -6,6 +6,7 @@ import ReactMarkdown from 'react-markdown';
 import ToolCallsDisplay from './ToolCallsDisplay';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { cn } from '@/lib/utils';
 
 interface MessageTabsProps {
   content: string;
@@ -18,16 +19,17 @@ export default function MessageTabs({ content, toolCalls }: MessageTabsProps) {
   const hasToolCalls = toolCalls && toolCalls.length > 0;
 
   return (
-    <div>
+    <div className="min-w-[280px] sm:min-w-[320px]">
       {/* Tab Navigation */}
-      <div className="flex border-b mb-4">
+      <div className="flex border-b border-border/50 mb-4 dark:border-border/60">
         <button
           onClick={() => setActiveTab('message')}
-          className={`flex items-center space-x-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+          className={cn(
+            "flex items-center space-x-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors",
             activeTab === 'message'
-              ? 'border-primary text-primary'
-              : 'border-transparent text-muted-foreground hover:text-foreground'
-          }`}
+              ? 'border-primary text-primary dark:border-primary/90 dark:text-primary/90'
+              : 'border-transparent text-muted-foreground hover:text-foreground dark:text-muted-foreground/80 dark:hover:text-foreground'
+          )}
         >
           <MessageCircle className="w-4 h-4" />
           <span>Message</span>
@@ -36,15 +38,16 @@ export default function MessageTabs({ content, toolCalls }: MessageTabsProps) {
         {hasToolCalls && (
           <button
             onClick={() => setActiveTab('tools')}
-            className={`flex items-center space-x-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            className={cn(
+              "flex items-center space-x-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors",
               activeTab === 'tools'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
+                ? 'border-primary text-primary dark:border-primary/90 dark:text-primary/90'
+                : 'border-transparent text-muted-foreground hover:text-foreground dark:text-muted-foreground/80 dark:hover:text-foreground'
+            )}
           >
             <Zap className="w-4 h-4" />
             <span>Tools</span>
-            <Badge variant="secondary" className="text-xs">
+            <Badge variant="secondary" className="text-xs bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary">
               {toolCalls.length}
             </Badge>
           </button>
@@ -52,9 +55,9 @@ export default function MessageTabs({ content, toolCalls }: MessageTabsProps) {
       </div>
 
       {/* Tab Content */}
-      <div className="min-h-[100px]">
+      <div className="min-h-[100px] min-w-[240px] sm:min-w-[280px]">
         {activeTab === 'message' && (
-          <div className="text-sm leading-relaxed prose prose-sm max-w-none">
+          <div className="text-sm leading-relaxed prose prose-sm max-w-none dark:prose-invert">
             <ReactMarkdown>{content}</ReactMarkdown>
           </div>
         )}

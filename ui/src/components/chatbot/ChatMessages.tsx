@@ -33,11 +33,11 @@ export default function ChatMessages({
         "flex flex-col animate-in fade-in-0 slide-in-from-bottom-2 duration-300",
         isUser ? "items-end" : "items-start"
       )}>
-        <div className="flex items-start space-x-3 max-w-[85%] md:max-w-[75%]">
+        <div className="flex items-start space-x-3 max-w-[85%] md:max-w-[75%] min-w-[280px] sm:min-w-[320px]">
           {!isUser && (
             <Avatar className="w-8 h-8 flex-shrink-0">
               <AvatarImage src="/bot-avatar.png" />
-              <AvatarFallback className="bg-primary text-primary-foreground">
+              <AvatarFallback className="bg-primary text-primary-foreground dark:bg-primary/90 dark:text-primary-foreground">
                 <Bot className="w-4 h-4" />
               </AvatarFallback>
             </Avatar>
@@ -47,9 +47,10 @@ export default function ChatMessages({
             className={cn(
               "flex-1 px-4 py-3 rounded-2xl transition-all duration-200",
               "shadow-sm border",
+              "min-w-[200px] sm:min-w-[240px]",
               isUser 
-                ? "bg-primary text-primary-foreground border-primary/20" 
-                : "bg-card text-card-foreground border-border/50"
+                ? "bg-primary text-primary-foreground border-primary/20 dark:bg-primary/90 dark:border-primary/30" 
+                : "bg-card text-card-foreground border-border/50 dark:bg-card/95 dark:border-border/60"
             )}
           >
             {!isUser && message.toolCalls ? (
@@ -59,7 +60,8 @@ export default function ChatMessages({
                 {message.content && (
                   <div className={cn(
                     "prose prose-sm max-w-none",
-                    !isUser && !isCompleted && "animate-fade-in"
+                    !isUser && !isCompleted && "animate-fade-in",
+                    "dark:prose-invert"
                   )}>
                     <span className="whitespace-pre-wrap">{message.content}</span>
                   </div>
@@ -82,7 +84,7 @@ export default function ChatMessages({
           {isUser && (
             <Avatar className="w-8 h-8 flex-shrink-0">
               <AvatarImage src="/user-avatar.png" />
-              <AvatarFallback className="bg-secondary text-secondary-foreground">
+              <AvatarFallback className="bg-secondary text-secondary-foreground dark:bg-secondary/90 dark:text-secondary-foreground">
                 <User className="w-4 h-4" />
               </AvatarFallback>
             </Avatar>
@@ -95,43 +97,45 @@ export default function ChatMessages({
             <Button
               variant="ghost"
               size="sm"
-              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground transition-colors"
+              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground transition-colors dark:text-muted-foreground/80 dark:hover:text-foreground"
               title="Regenerate"
             >
-              <RefreshCcw className="h-3 w-3" />
+              <RefreshCcw className="w-3 h-3" />
             </Button>
             <Button
               variant="ghost"
               size="sm"
-              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground transition-colors"
-              title="Copy"
+              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground transition-colors dark:text-muted-foreground/80 dark:hover:text-foreground"
+              title="Copy message"
             >
-              <Copy className="h-3 w-3" />
+              <Copy className="w-3 h-3" />
             </Button>
             <Button
               variant="ghost"
               size="sm"
-              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground transition-colors"
-              title="Share"
+              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground transition-colors dark:text-muted-foreground/80 dark:hover:text-foreground"
+              title="Share message"
             >
-              <Share2 className="h-3 w-3" />
+              <Share2 className="w-3 h-3" />
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground transition-colors"
-              title="Like"
-            >
-              <ThumbsUp className="h-3 w-3" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground transition-colors"
-              title="Dislike"
-            >
-              <ThumbsDown className="h-3 w-3" />
-            </Button>
+            <div className="flex items-center gap-1 ml-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0 text-muted-foreground hover:text-green-600 transition-colors dark:text-muted-foreground/80 dark:hover:text-green-400"
+                title="Thumbs up"
+              >
+                <ThumbsUp className="w-3 h-3" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0 text-muted-foreground hover:text-red-600 transition-colors dark:text-muted-foreground/80 dark:hover:text-red-400"
+                title="Thumbs down"
+              >
+                <ThumbsDown className="w-3 h-3" />
+              </Button>
+            </div>
           </div>
         )}
 
@@ -147,8 +151,20 @@ export default function ChatMessages({
   };
 
   return (
-    <div className="space-y-6 group">
-      {messages.map(renderMessage)}
+    <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
+      {messages.length === 0 ? (
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center text-muted-foreground dark:text-muted-foreground/80">
+            <Bot className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50 dark:text-muted-foreground/30" />
+            <p className="text-lg font-medium">Start a conversation</p>
+            <p className="text-sm">Ask me anything about DeFi, wallets, tokens, and more!</p>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {messages.map(renderMessage)}
+        </div>
+      )}
     </div>
   );
 } 

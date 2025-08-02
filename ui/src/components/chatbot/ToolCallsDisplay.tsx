@@ -5,6 +5,7 @@ import { ChevronDown, ChevronRight, Code, Zap } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { cn } from '@/lib/utils';
 
 interface ToolCall {
   name: string;
@@ -47,39 +48,39 @@ export default function ToolCallsDisplay({ toolCalls }: ToolCallsDisplayProps) {
         <div className="ml-4">
           {Array.isArray(value) ? (
             <div>
-              <span className="text-muted-foreground">[</span>
+              <span className="text-muted-foreground dark:text-muted-foreground/80">[</span>
               <div className="ml-4">
                 {value.map((item, index) => (
                   <div key={index} className="flex items-start">
-                    <span className="text-muted-foreground mr-2">{index}:</span>
+                    <span className="text-muted-foreground dark:text-muted-foreground/80 mr-2">{index}:</span>
                     <div className="flex-1">
                       {isExpandable(item) ? renderValue(item, depth + 1) : formatValue(item)}
                     </div>
                   </div>
                 ))}
               </div>
-              <span className="text-muted-foreground">]</span>
+              <span className="text-muted-foreground dark:text-muted-foreground/80">]</span>
             </div>
           ) : (
             <div>
-              <span className="text-muted-foreground">{'{'}</span>
+              <span className="text-muted-foreground dark:text-muted-foreground/80">{'{'}</span>
               <div className="ml-4">
                 {Object.entries(value).map(([key, val]) => (
                   <div key={key} className="flex items-start">
-                    <span className="text-primary mr-2">"{key}":</span>
+                    <span className="text-primary dark:text-primary/90 mr-2">"{key}":</span>
                     <div className="flex-1">
                       {isExpandable(val) ? renderValue(val, depth + 1) : formatValue(val)}
                     </div>
                   </div>
                 ))}
               </div>
-              <span className="text-muted-foreground">{'}'}</span>
+              <span className="text-muted-foreground dark:text-muted-foreground/80">{'}'}</span>
             </div>
           )}
         </div>
       );
     }
-    return <span className="text-foreground">{formatValue(value)}</span>;
+    return <span className="text-foreground dark:text-foreground">{formatValue(value)}</span>;
   };
 
   if (!toolCalls || toolCalls.length === 0) {
@@ -87,57 +88,62 @@ export default function ToolCallsDisplay({ toolCalls }: ToolCallsDisplayProps) {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 min-w-[280px] sm:min-w-[320px]">
       <div className="flex items-center space-x-2">
-        <Zap className="w-4 h-4 text-primary" />
-        <span className="text-sm font-medium text-foreground">
+        <Zap className="w-4 h-4 text-primary dark:text-primary/90" />
+        <span className="text-sm font-medium text-foreground dark:text-foreground">
           Tools Called
         </span>
-        <Badge variant="secondary" className="text-xs">
+        <Badge variant="secondary" className="text-xs bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary">
           {toolCalls.length}
         </Badge>
       </div>
       
       <div className="space-y-2">
         {toolCalls.map((tool, index) => (
-          <Card key={index} className="border">
+          <Card key={index} className="border-border/50 dark:border-border/60 min-w-[240px] sm:min-w-[280px]">
             <CardHeader className="pb-2">
-              <button
-                onClick={() => toggleTool(index)}
-                className="w-full flex items-center justify-between text-left hover:bg-muted/50 transition-colors rounded-md p-2 -m-2"
-              >
+              <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <Code className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm font-medium text-foreground">{tool.name}</span>
+                  <Code className="w-4 h-4 text-primary dark:text-primary/90" />
+                  <CardTitle className="text-sm font-medium text-foreground dark:text-foreground">
+                    {tool.name}
+                  </CardTitle>
                 </div>
-                {expandedTools.has(index) ? (
-                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                ) : (
-                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                )}
-              </button>
+                <button
+                  onClick={() => toggleTool(index)}
+                  className="p-1 rounded hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/80 dark:hover:text-accent-foreground transition-colors"
+                >
+                  {expandedTools.has(index) ? (
+                    <ChevronDown className="w-4 h-4" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
             </CardHeader>
             
             {expandedTools.has(index) && (
-              <CardContent className="pt-0 space-y-3">
-                <Separator />
-                <div className="space-y-3">
+              <CardContent className="pt-0">
+                <div className="space-y-4">
                   {/* Arguments */}
                   <div>
-                    <div className="text-xs font-medium text-muted-foreground mb-2">Arguments:</div>
-                    <div className="bg-muted rounded-md p-3 text-xs font-mono border">
-                      {Object.keys(tool.arguments).length > 0 ? (
-                        renderValue(tool.arguments)
-                      ) : (
-                        <span className="text-muted-foreground">No arguments</span>
-                      )}
+                    <h4 className="text-xs font-medium text-muted-foreground dark:text-muted-foreground/80 mb-2">
+                      Arguments
+                    </h4>
+                    <div className="bg-muted/50 dark:bg-muted/30 rounded p-3 text-xs font-mono min-w-[200px] sm:min-w-[240px]">
+                      {renderValue(tool.arguments)}
                     </div>
                   </div>
                   
+                  <Separator className="dark:bg-border/60" />
+                  
                   {/* Result */}
                   <div>
-                    <div className="text-xs font-medium text-muted-foreground mb-2">Result:</div>
-                    <div className="bg-muted rounded-md p-3 text-xs font-mono border max-h-40 overflow-y-auto">
+                    <h4 className="text-xs font-medium text-muted-foreground dark:text-muted-foreground/80 mb-2">
+                      Result
+                    </h4>
+                    <div className="bg-muted/50 dark:bg-muted/30 rounded p-3 text-xs font-mono min-w-[200px] sm:min-w-[240px]">
                       {renderValue(tool.result)}
                     </div>
                   </div>
