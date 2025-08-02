@@ -1,10 +1,10 @@
 [package]
-name = "MessageBoard"
+name = "FusionSwapAptos"
 version = "1.0.0"
-authors = []
+authors = ["Fusion Swap Team"]
 
 [addresses]
-message_board_addr = "_"
+fusion_swap_addr = "0x1"
 
 [dependencies]
 AptosFramework = { git = "https://github.com/aptos-labs/aptos-framework.git", rev = "mainnet", subdir = "aptos-framework" }
