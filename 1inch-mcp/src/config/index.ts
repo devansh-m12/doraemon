@@ -4,6 +4,8 @@ import { config as validateConfig } from './validation';
 // Load environment variables
 dotenv.config();
 
+
+
 export const config = {
   // Server configuration
   server: {
@@ -23,7 +25,7 @@ export const config = {
   openRouter: {
     apiKey: process.env.OPENROUTER_API_KEY || '',
     baseUrl: process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1',
-    timeout: parseInt(process.env.OPENROUTER_TIMEOUT || '60000', 10),
+    timeout: 0, // No timeout - let requests run as long as needed
     models: {
       small: process.env.OPENROUTER_SMALL_MODEL || '',
       large: process.env.OPENROUTER_LARGE_MODEL || '',

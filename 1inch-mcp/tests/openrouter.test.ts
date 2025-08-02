@@ -1,18 +1,13 @@
 import { OpenRouterService } from '../src/services/openrouter/OpenRouterService';
 import { config } from '../src/config/index';
-import { describe, it, beforeEach, expect, jest, beforeAll } from '@jest/globals';
+import { describe, it, expect, beforeAll } from '@jest/globals';
 
-describe('OpenRouterService', () => {
+describe('OpenRouterService - Balance Fetching', () => {
   let openRouterService: OpenRouterService;
   
   // Test configuration
+  const testAddress = '0xd8da6bf26964af9d7eed9e03e53415d37aa96045'; // Vitalik's address
   const testModel = config.openRouter.models.large;
-  const testMessages = [
-    {
-      role: 'user' as const,
-      content: 'Hello, how are you? and tell me random fact'
-    }
-  ];
 
   beforeAll(() => {
     const serviceConfig = {
@@ -23,25 +18,19 @@ describe('OpenRouterService', () => {
     openRouterService = new OpenRouterService(serviceConfig);
   });
 
-  describe('Chat Completion', () => {
-    it('should handle chat completion with valid parameters', async () => {
-      const args = {
-        model: testModel,
-        messages: testMessages,
-        temperature: 0.7,
-        max_tokens: 100
-      };
+  it('should attempt to fetch balance of address using intelligent chat', async () => {
+    const args = {
+      conversationId: 'balance-test',
+      message: `What is the balance of ${testAddress} on Ethereum?`,
+      model: testModel
+    };
 
-      const result = await openRouterService.handleToolCall('chat_completion', args);
-      console.log(result);
-      
-      expect(result).toBeDefined();
-      expect(result.success).toBe(true);
-      expect(result.data).toBeDefined();
-      expect(result.data.completion).toBeDefined();
-      expect(result.data.model).toBe(testModel);
-      expect(result.data.usage).toBeDefined();
-      expect(result.data.finish_reason).toBeDefined();
-    }, 30000); // 30 second timeout for API call
-  });
+    // Test that the service can handle the request with proper authentication
+    const result = await openRouterService.handleToolCall('intelligent_chat', args);
+    console.log('Success! Balance fetch result:', JSON.stringify(result, null, 2));
+    expect(result).toBeDefined();
+    expect(result.success).toBe(true);
+    expect(result.data).toBeDefined();
+    expect(result.data.response).toBeDefined();
+  }, 120000); // 2 minute timeout for API calls
 }); 

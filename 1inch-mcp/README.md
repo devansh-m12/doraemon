@@ -1,364 +1,187 @@
-# 1inch MCP Server
+# 1inch MCP Server with Intelligent Chat
 
-A comprehensive Model Context Protocol (MCP) server that provides access to 1inch APIs through a modular, service-based architecture, optimized for use with Cursor IDE.
+A Model Context Protocol (MCP) server that provides access to 1inch DEX aggregator APIs with intelligent chat capabilities powered by OpenRouter.
 
-## 🚀 Features
+## Features
 
-- **Service-Based Architecture**: Modular design with separate services for different API domains
-- **Complete 1inch API Coverage**: All APIs with 35+ endpoints organized into services
-- **Cursor IDE Integration**: Optimized for AI-assisted development
-- **Type Safety**: Full TypeScript coverage with strict typing
-- **Industry Standards**: Follows Node.js best practices
-- **Production Ready**: Error handling, logging, caching, and monitoring
-- **Easy Extension**: Add new services without modifying existing code
+### 🤖 Intelligent Chat Assistant
+- **Conversational AI**: Powered by OpenRouter with access to multiple AI models
+- **Tool Integration**: Automatically calls relevant DeFi tools based on user queries
+- **Context Management**: Maintains conversation history and context
+- **Real-time Responses**: Instant responses with tool execution results
 
-## 🏗️ Architecture
+### 🛠️ Available Tools
+- **Wallet Analysis**: Check balances, allowances, and portfolio overviews
+- **Token Information**: Get token details, prices, and market data
+- **Trading Tools**: Get swap quotes, orderbook data, and trading history
+- **Market Data**: Access price charts, gas prices, and market trends
+- **NFT Services**: Check NFT balances and collections
+- **Domain Services**: Resolve domains and get domain information
 
-### Service-Based Design
+### 🏗️ Architecture
+- **Service-Based**: Modular architecture with dedicated services for each API
+- **HTTP Server**: RESTful API for easy integration
+- **MCP Protocol**: Standard Model Context Protocol implementation
+- **TypeScript**: Fully typed for better development experience
 
-The project uses a modular service-based architecture where each API domain is encapsulated in its own service:
+## Quick Start
 
-```
-src/
-├── services/
-│   ├── base/
-│   │   └── BaseService.ts          # Abstract base class for all services
-│   ├── swap/
-│   │   ├── SwapService.ts          # Swap API functionality
-│   │   └── SwapTypes.ts            # Swap-specific types
-│   ├── token/
-│   │   ├── TokenService.ts         # Token API functionality
-│   │   └── TokenTypes.ts           # Token-specific types
-│   └── ServiceOrchestrator.ts      # Main orchestrator
-```
-
-### Available Services
-
-#### Swap Service
-- **get_swap_quote**: Get optimal swap rates across DEXs
-- **get_swap_transaction**: Get transaction data for execution
-- **get_token_allowance**: Check token spending approvals
-- **get_approve_transaction**: Generate approval transactions
-
-#### Token Service
-- **get_token_info**: Get detailed token information
-- **search_tokens**: Search tokens by name or symbol
-- **get_token_price**: Get current token prices
-- **get_token_balances**: Get wallet token balances
-
-## 🛠️ Quick Start
-
-### 1. Prerequisites
-
-- Node.js 18+ 
-- npm or yarn
-- 1inch API key (get one at [1inch Developer Portal](https://portal.1inch.dev/))
-
-### 2. Installation
-
+### 1. Install Dependencies
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd 1inch-mcp
-
-# Install dependencies
 npm install
+```
 
-# Copy environment file
+### 2. Environment Setup
+Copy the environment file and configure your API keys:
+```bash
 cp env.example .env
-
-# Edit .env with your API key
-# ONEINCH_API_KEY=your_actual_api_key_here
 ```
 
-### 3. Build and Run
-
-```bash
-# Build the project
-npm run build
-
-# Run in development mode
-npm run dev
-
-# Run in production mode
-npm start
-```
-
-## 🧪 Testing
-
-```bash
-# Run all tests
-npm test
-
-# Run tests in watch mode
-npm run test:watch
-
-# Run tests with coverage
-npm run test:coverage
-
-# Run only service tests
-npm run test:services
-```
-
-## 🔧 Configuration
-
-### Environment Variables
-
-Create a `.env` file based on `env.example`:
-
+Required environment variables:
 ```env
-# 1inch API Configuration
+# 1inch API
 ONEINCH_API_KEY=your_1inch_api_key_here
-ONEINCH_BASE_URL=https://api.1inch.dev
-ONEINCH_TIMEOUT=30000
 
-# Server Configuration
-NODE_ENV=development
-PORT=3000
-LOG_LEVEL=info
-
-# Cache Configuration (optional)
-REDIS_URL=redis://localhost:6379
-CACHE_TTL=300
-CACHE_ENABLED=true
-
-# Rate Limiting
-RATE_LIMIT_WINDOW_MS=900000
-RATE_LIMIT_MAX_REQUESTS=100
-
-# Security
-CORS_ORIGIN=*
-HELMET_ENABLED=true
+# OpenRouter API
+OPENROUTER_API_KEY=your_openrouter_api_key_here
+OPENROUTER_SMALL_MODEL=gpt-3.5-turbo
+OPENROUTER_LARGE_MODEL=gpt-4
 ```
 
-## 🎯 Cursor IDE Integration
+### 3. Start the Server
+```bash
+# Development mode
+npm run dev:http
 
-### 1. MCP Configuration
+# Production mode
+npm run start:http
+```
 
-Add this to your Cursor settings:
+The server will start on port 6969 (configurable via MCP_PORT).
 
+### 4. Start the UI
+```bash
+cd ui
+npm install
+npm run dev
+```
+
+The UI will be available at http://localhost:3000.
+
+## Usage
+
+### Chat Interface
+The web interface provides a modern chat experience where you can:
+
+1. **Ask Questions**: "What's the balance of 0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b6?"
+2. **Get Token Info**: "Tell me about the USDC token"
+3. **Check Prices**: "What's the current price of ETH?"
+4. **Portfolio Analysis**: "Show me the portfolio for 0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b6"
+
+### API Endpoints
+
+#### Chat Endpoints
+- `POST /mcp` - Call the intelligent chat tool
+- `GET /tools` - List available tools
+- `GET /health` - Health check
+
+#### Example Chat Request
 ```json
 {
-  "mcpServers": {
-    "1inch-mcp-server": {
-      "command": "node",
-      "args": ["/absolute/path/to/1inch-mcp/dist/index.js"],
-      "env": {
-        "ONEINCH_API_KEY": "your_api_key_here"
-      }
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "intelligent_chat",
+    "arguments": {
+      "conversationId": "conv_123",
+      "message": "What's the balance of 0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b6?"
     }
   }
 }
 ```
 
-### 2. Usage Examples
+## Available Tools
 
-Once configured, you can use natural language in Cursor:
+### Chat Tools
+- `intelligent_chat` - Main chat interface with tool orchestration
+- `chat_completion` - Direct OpenRouter chat completion
+- `get_conversation_history` - Retrieve conversation history
+- `clear_conversation` - Clear conversation history
 
-```typescript
-// Ask Cursor: "Create a function to swap 1 ETH for USDC with 1% slippage"
-async function swapETHForUSDC(amount: string, slippage: number = 1) {
-  const quote = await mcpClient.callTool('get_swap_quote', {
-    chainId: 1,
-    src: '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee', // ETH
-    dst: '0xa0b86a33e6e4b8b5f8c1e9d6b2a8c3e7f9d5c8a7', // USDC
-    amount: amount,
-    from: walletAddress,
-    slippage: slippage
-  });
-  
-  return quote;
-}
+### DeFi Tools
+- `get_wallet_balances` - Get wallet token balances
+- `get_aggregated_balances_and_allowances` - Multi-wallet balance check
+- `get_spot_price` - Get token spot prices
+- `get_swap_quote` - Get swap quotes
+- `get_token_info` - Get token information
+- `get_gas_price` - Get network gas prices
+- `get_portfolio_overview` - Get portfolio analysis
+- `get_nft_balances` - Get NFT balances
+- `get_chart_data` - Get price chart data
+- `get_domain_info` - Get domain information
 
-// Ask Cursor: "Get token information for USDC"
-async function getTokenInfo(tokenAddress: string) {
-  const info = await mcpClient.callTool('get_token_info', {
-    chainId: 1,
-    tokenAddress: tokenAddress
-  });
-  
-  return info;
-}
-```
-
-## 🏗️ Development
+## Development
 
 ### Project Structure
-
 ```
-1inch-mcp/
-├── src/
-│   ├── index.ts                    # Main entry point
-│   ├── mcp/
-│   │   └── server.ts               # MCP server implementation
-│   ├── services/
-│   │   ├── base/
-│   │   │   └── BaseService.ts      # Abstract base class
-│   │   ├── swap/
-│   │   │   ├── SwapService.ts      # Swap API service
-│   │   │   └── SwapTypes.ts        # Swap types
-│   │   ├── token/
-│   │   │   ├── TokenService.ts     # Token API service
-│   │   │   └── TokenTypes.ts       # Token types
-│   │   └── ServiceOrchestrator.ts  # Service orchestrator
-│   ├── config/
-│   │   ├── index.ts                # Configuration loader
-│   │   ├── logger.ts               # Winston logger
-│   │   └── validation.ts           # Config validation
-│   └── utils/
-│       ├── constants.ts             # App constants
-│       └── helpers.ts               # Helper functions
-├── tests/
-│   └── services/
-│       ├── SwapService.test.ts      # Swap service tests
-│       └── TokenService.test.ts     # Token service tests
-├── docs/                           # Documentation
-├── cursor/                         # Cursor-specific config
-└── scripts/                        # Build scripts
+src/
+├── config/           # Configuration management
+├── mcp/             # MCP protocol implementation
+├── services/        # Service modules
+│   ├── balance/     # Balance checking services
+│   ├── swap/        # Swap and trading services
+│   ├── token/       # Token information services
+│   ├── openrouter/  # AI chat services
+│   └── ...          # Other services
+└── utils/           # Utility functions
 ```
 
 ### Adding New Services
+1. Create a new service directory in `src/services/`
+2. Extend `BaseService` class
+3. Implement required methods: `getTools()`, `getResources()`, `getPrompts()`
+4. Add service to `ServiceOrchestrator`
 
-To add a new service (e.g., Portfolio Service):
-
-1. Create the service directory:
+### Testing
 ```bash
-mkdir src/services/portfolio
+# Run all tests
+npm test
+
+# Run specific service tests
+npm run test:services
+
+# Watch mode
+npm run test:watch
 ```
 
-2. Create the types file:
-```typescript
-// src/services/portfolio/PortfolioTypes.ts
-export interface PortfolioRequest {
-  address: string;
-  chains?: number[];
-}
+## Configuration
 
-export interface PortfolioResponse {
-  address: string;
-  totalValue: string;
-  chains: any[];
-}
-```
+### OpenRouter Models
+Configure different models for different use cases:
+- **Small Model**: Fast responses for simple queries
+- **Large Model**: More capable for complex analysis
 
-3. Create the service class:
-```typescript
-// src/services/portfolio/PortfolioService.ts
-import { BaseService, ServiceConfig } from '../base/BaseService';
-import { PortfolioRequest, PortfolioResponse } from './PortfolioTypes';
+### Chat Settings
+- **Max Tokens**: Control response length
+- **Temperature**: Control response creativity
+- **Session Timeout**: Conversation cleanup
 
-export class PortfolioService extends BaseService {
-  constructor(serviceConfig: ServiceConfig) {
-    super(serviceConfig);
-  }
-
-  getTools(): ToolDefinition[] {
-    return [
-      {
-        name: 'get_portfolio_overview',
-        description: 'Get portfolio overview',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            address: { type: 'string', description: 'Wallet address' }
-          },
-          required: ['address']
-        }
-      }
-    ];
-  }
-
-  // Implement other abstract methods...
-}
-```
-
-4. Add the service to the orchestrator:
-```typescript
-// src/services/ServiceOrchestrator.ts
-import { PortfolioService } from './portfolio/PortfolioService';
-
-// In initializeServices method:
-this.services.set('portfolio', new PortfolioService(serviceConfig));
-```
-
-5. Create tests:
-```typescript
-// tests/services/PortfolioService.test.ts
-import { PortfolioService } from '../../src/services/portfolio/PortfolioService';
-
-describe('PortfolioService', () => {
-  // Test implementation...
-});
-```
-
-### Development Commands
-
-```bash
-# Development with hot reload
-npm run dev
-
-# Build for production
-npm run build
-
-# Lint code
-npm run lint
-
-# Format code
-npm run format
-
-# Generate documentation
-npm run docs:generate
-```
-
-## 🚀 Deployment
-
-### Local Development
-```bash
-npm run dev
-```
-
-### Production Build
-```bash
-npm run build
-npm start
-```
-
-### Docker Deployment
-```dockerfile
-FROM node:18-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
-COPY dist ./dist
-EXPOSE 3000
-CMD ["node", "dist/index.js"]
-```
-
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Add tests for new services
+4. Add tests
 5. Submit a pull request
 
-## 📄 License
+## License
 
-MIT License - see LICENSE file for details
+MIT License - see LICENSE file for details.
 
-## 🔗 Links
+## Support
 
-- [1inch Developer Portal](https://portal.1inch.dev/)
-- [Model Context Protocol](https://modelcontextprotocol.io/)
-- [Cursor IDE](https://cursor.com/)
-- [Documentation](docs/)
-
-## 🆘 Support
-
-- Create an issue for bugs or feature requests
-- Check the documentation in the `docs/` folder
-- Join the community discussions
-
----
-
-Built with ❤️ for the DeFi community using service-based architecture 
+For issues and questions:
+- Create an issue on GitHub
+- Check the documentation
+- Review the test examples 

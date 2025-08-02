@@ -16,7 +16,7 @@ const configSchema = Joi.object({
   openRouter: Joi.object({
     apiKey: Joi.string().allow('').default(''),
     baseUrl: Joi.string().uri().default('https://openrouter.ai/api/v1'),
-    timeout: Joi.number().positive().default(60000),
+    timeout: Joi.number().min(0).default(0), // Allow 0 for no timeout
     models: Joi.object({
       small: Joi.string().allow('').default(''),
       large: Joi.string().allow('').default(''),

@@ -53,7 +53,16 @@ export class ServiceOrchestrator {
     this.services.set('domain', new DomainService(serviceConfig));
     this.services.set('intent-swap', new IntentSwapService(serviceConfig));
     this.services.set('fusion-plus-swap', new FusionPlusSwapService(serviceConfig));
-    this.services.set('openrouter', new OpenRouterService(serviceConfig));
+    
+    // Initialize OpenRouter service with orchestrator reference
+    const openRouterServiceConfig = {
+      baseUrl: config.openRouter.baseUrl,
+      apiKey: config.openRouter.apiKey,
+      timeout: config.openRouter.timeout
+    };
+    const openRouterService = new OpenRouterService(openRouterServiceConfig, this);
+    this.services.set('openrouter', openRouterService);
+    
     logger.info(`Initialized ${this.services.size} services`);
   }
 
@@ -95,11 +104,18 @@ export class ServiceOrchestrator {
       
       if (toolExists) {
         logger.debug(`Routing tool call '${name}' to ${serviceName} service`);
-        return await service.handleToolCall(name, args);
+        try {
+          return await service.handleToolCall(name, args);
+        } catch (error) {
+          logger.error(`Error executing tool '${name}' in ${serviceName} service:`, error);
+          throw error;
+        }
       }
     }
 
-    throw new Error(`Unknown tool: ${name}`);
+    // If tool not found, provide helpful error message with available tools
+    const availableTools = this.getAllTools().map(tool => tool.name);
+    throw new Error(`Unknown tool: ${name}. Available tools: ${availableTools.join(', ')}`);
   }
 
   async handleResourceRead(uri: string): Promise<any> {
@@ -110,11 +126,18 @@ export class ServiceOrchestrator {
       
       if (resourceExists) {
         logger.debug(`Routing resource read '${uri}' to ${serviceName} service`);
-        return await service.handleResourceRead(uri);
+        try {
+          return await service.handleResourceRead(uri);
+        } catch (error) {
+          logger.error(`Error reading resource '${uri}' in ${serviceName} service:`, error);
+          throw error;
+        }
       }
     }
 
-    throw new Error(`Unknown resource: ${uri}`);
+    // If resource not found, provide helpful error message with available resources
+    const availableResources = this.getAllResources().map(resource => resource.uri);
+    throw new Error(`Unknown resource: ${uri}. Available resources: ${availableResources.join(', ')}`);
   }
 
   async handlePromptRequest(name: string, args: any): Promise<any> {
@@ -125,11 +148,18 @@ export class ServiceOrchestrator {
       
       if (promptExists) {
         logger.debug(`Routing prompt request '${name}' to ${serviceName} service`);
-        return await service.handlePromptRequest(name, args);
+        try {
+          return await service.handlePromptRequest(name, args);
+        } catch (error) {
+          logger.error(`Error handling prompt '${name}' in ${serviceName} service:`, error);
+          throw error;
+        }
       }
     }
 
-    throw new Error(`Unknown prompt: ${name}`);
+    // If prompt not found, provide helpful error message with available prompts
+    const availablePrompts = this.getAllPrompts().map(prompt => prompt.name);
+    throw new Error(`Unknown prompt: ${name}. Available prompts: ${availablePrompts.join(', ')}`);
   }
 
   getService(name: string): BaseService | undefined {
@@ -138,6 +168,33 @@ export class ServiceOrchestrator {
 
   getServiceNames(): string[] {
     return Array.from(this.services.keys());
+  }
+
+  getToolsByService(serviceName: string): ToolDefinition[] {
+    const service = this.services.get(serviceName);
+    return service ? service.getTools() : [];
+  }
+
+  getServiceForTool(toolName: string): string | null {
+    for (const [serviceName, service] of this.services.entries()) {
+      const tools = service.getTools();
+      const toolExists = tools.some(tool => tool.name === toolName);
+      if (toolExists) {
+        return serviceName;
+      }
+    }
+    return null;
+  }
+
+  getToolInfo(toolName: string): ToolDefinition | null {
+    for (const service of this.services.values()) {
+      const tools = service.getTools();
+      const tool = tools.find(tool => tool.name === toolName);
+      if (tool) {
+        return tool;
+      }
+    }
+    return null;
   }
 
   async healthCheck(): Promise<any> {

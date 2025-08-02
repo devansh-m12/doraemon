@@ -58,6 +58,7 @@
     "joi": "^17.11.0",
     "morgan": "^1.10.0",
     "node-cache": "^5.1.2",
+    "openai": "^5.11.0",
     "rate-limiter-flexible": "^4.0.1",
     "redis": "^4.6.0",
     "uuid": "^9.0.1",

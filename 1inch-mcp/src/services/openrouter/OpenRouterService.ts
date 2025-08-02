@@ -3,24 +3,24 @@ import {
   OpenRouterConfig, 
   ChatCompletionRequest, 
   ChatCompletionResponse,
-  EmbeddingRequest,
-  EmbeddingResponse,
-  ModelInfo,
-  UsageInfo,
-  OpenRouterError,
-  OpenRouterErrorType,
-  OpenRouterModelsResponse,
-  OpenRouterUsageResponse,
-  ChatMessage
+  ChatMessage,
+  ConversationContext,
+  ToolCallRequest,
+  ToolCallResult
 } from './OpenRouterTypes';
 import { config } from '../../config/index';
 import { logger } from '../../config/logger';
+import { OpenAIClient } from '../../utils/llm/openai-client';
 
 export class OpenRouterService extends BaseService {
   private openRouterConfig: OpenRouterConfig;
+  private conversations: Map<string, ConversationContext> = new Map();
+  private orchestrator?: any;
+  private openAIClient: OpenAIClient;
 
-  constructor(serviceConfig: any) {
+  constructor(serviceConfig: any, orchestrator?: any) {
     super(serviceConfig);
+    this.orchestrator = orchestrator;
     this.openRouterConfig = {
       baseUrl: config.openRouter.baseUrl,
       apiKey: config.openRouter.apiKey,
@@ -29,97 +29,44 @@ export class OpenRouterService extends BaseService {
       maxTokens: config.openRouter.maxTokens,
       temperature: config.openRouter.temperature
     };
+    
+    // Initialize OpenAI client
+    this.openAIClient = new OpenAIClient({
+      apiKey: this.openRouterConfig.apiKey,
+      baseURL: this.openRouterConfig.baseUrl,
+      timeout: this.openRouterConfig.timeout,
+      model: this.openRouterConfig.models.large,
+      temperature: this.openRouterConfig.temperature,
+      maxTokens: this.openRouterConfig.maxTokens,
+    });
   }
 
   getTools(): ToolDefinition[] {
     return [
       {
-        name: 'chat_completion',
-        description: 'Generate chat completions using OpenRouter API',
+        name: 'intelligent_chat',
+        description: 'Intelligent chat with automatic tool calling and context management',
         inputSchema: {
           type: 'object',
           properties: {
+            conversationId: {
+              type: 'string',
+              description: 'Unique conversation ID for context management'
+            },
+            message: {
+              type: 'string',
+              description: 'User message to process'
+            },
             model: {
               type: 'string',
-              description: 'The model to use for completion (will use configured small model if not specified)'
-            },
-            messages: {
-              type: 'array',
-              description: 'Array of chat messages',
-              items: {
-                type: 'object',
-                properties: {
-                  role: {
-                    type: 'string',
-                    enum: ['system', 'user', 'assistant']
-                  },
-                  content: {
-                    type: 'string'
-                  }
-                },
-                required: ['role', 'content']
-              }
+              description: 'The model to use for completion'
             },
             temperature: {
               type: 'number',
               description: 'Controls randomness (0-2, default: 0.7)'
-            },
-            max_tokens: {
-              type: 'number',
-              description: 'Maximum tokens to generate (default: 4096)'
             }
           },
-          required: ['messages']
-        }
-      },
-      {
-        name: 'generate_embeddings',
-        description: 'Generate embeddings using OpenRouter API',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            model: {
-              type: 'string',
-              description: 'The embedding model to use (will use configured small model if not specified)'
-            },
-            input: {
-              type: 'string',
-              description: 'Text to generate embeddings for'
-            }
-          },
-          required: ['input']
-        }
-      },
-      {
-        name: 'list_models',
-        description: 'List available models on OpenRouter',
-        inputSchema: {
-          type: 'object',
-          properties: {},
-          required: []
-        }
-      },
-      {
-        name: 'get_model_info',
-        description: 'Get information about a specific model',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            model: {
-              type: 'string',
-              description: 'The model ID to get information about'
-            }
-          },
-          required: ['model']
-        }
-      },
-      {
-        name: 'get_usage_info',
-        description: 'Get usage information and costs',
-        inputSchema: {
-          type: 'object',
-          properties: {},
-          required: []
+          required: ['conversationId', 'message']
         }
       }
     ];
@@ -132,18 +79,6 @@ export class OpenRouterService extends BaseService {
         name: 'OpenRouter Documentation',
         description: 'Official OpenRouter API documentation',
         mimeType: 'text/html'
-      },
-      {
-        uri: 'https://openrouter.ai/models',
-        name: 'Available Models',
-        description: 'List of available models on OpenRouter',
-        mimeType: 'application/json'
-      },
-      {
-        uri: 'https://openrouter.ai/api/v1',
-        name: 'OpenRouter API Reference',
-        description: 'OpenRouter API reference and endpoints',
-        mimeType: 'application/json'
       }
     ];
   }
@@ -165,33 +100,6 @@ export class OpenRouterService extends BaseService {
             required: false
           }
         ]
-      },
-      {
-        name: 'model_selection',
-        description: 'Get recommendations for model selection',
-        arguments: [
-          {
-            name: 'use_case',
-            description: 'Your specific use case',
-            required: true
-          },
-          {
-            name: 'budget',
-            description: 'Your budget constraints',
-            required: false
-          }
-        ]
-      },
-      {
-        name: 'usage_optimization',
-        description: 'Get tips for optimizing API usage and costs',
-        arguments: [
-          {
-            name: 'current_usage',
-            description: 'Your current usage patterns',
-            required: false
-          }
-        ]
       }
     ];
   }
@@ -199,16 +107,8 @@ export class OpenRouterService extends BaseService {
   async handleToolCall(name: string, args: any): Promise<any> {
     try {
       switch (name) {
-        case 'chat_completion':
-          return await this.handleChatCompletion(args);
-        case 'generate_embeddings':
-          return await this.handleEmbeddings(args);
-        case 'list_models':
-          return await this.handleListModels();
-        case 'get_model_info':
-          return await this.handleGetModelInfo(args);
-        case 'get_usage_info':
-          return await this.handleGetUsageInfo();
+        case 'intelligent_chat':
+          return await this.handleIntelligentChat(args);
         default:
           throw new Error(`Unknown tool: ${name}`);
       }
@@ -221,22 +121,11 @@ export class OpenRouterService extends BaseService {
 
   async handleResourceRead(uri: string): Promise<any> {
     try {
-      // For now, return static information about OpenRouter resources
       const resourceMap: Record<string, any> = {
         'https://openrouter.ai/docs': {
           title: 'OpenRouter Documentation',
           description: 'Official documentation for OpenRouter API',
           url: 'https://openrouter.ai/docs'
-        },
-        'https://openrouter.ai/models': {
-          title: 'Available Models',
-          description: 'List of all available models on OpenRouter',
-          url: 'https://openrouter.ai/models'
-        },
-        'https://openrouter.ai/api/v1': {
-          title: 'API Reference',
-          description: 'Complete API reference for OpenRouter',
-          url: 'https://openrouter.ai/api/v1'
         }
       };
 
@@ -253,10 +142,6 @@ export class OpenRouterService extends BaseService {
       switch (name) {
         case 'ai_assistant':
           return await this.handleAIAssistant(args);
-        case 'model_selection':
-          return await this.handleModelSelection(args);
-        case 'usage_optimization':
-          return await this.handleUsageOptimization(args);
         default:
           throw new Error(`Unknown prompt: ${name}`);
       }
@@ -264,113 +149,6 @@ export class OpenRouterService extends BaseService {
       logger.error(`Error in OpenRouter prompt request ${name}:`, error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       return this.createErrorResponse(`Failed to handle prompt: ${errorMessage}`);
-    }
-  }
-
-  private async handleChatCompletion(args: any): Promise<any> {
-    this.validateRequiredParams(args, ['messages']);
-    
-    // Determine which model to use based on args or default to small model
-    let modelToUse = args.model;
-    if (!modelToUse) {
-      // If no model specified, use small model if available, otherwise throw error
-      if (this.openRouterConfig.models.small) {
-        modelToUse = this.openRouterConfig.models.small;
-      } else if (this.openRouterConfig.models.large) {
-        modelToUse = this.openRouterConfig.models.large;
-      } else {
-        throw new Error('No model configured. Please set OPENROUTER_SMALL_MODEL or OPENROUTER_LARGE_MODEL environment variable.');
-      }
-    }
-    
-    const request: ChatCompletionRequest = {
-      model: modelToUse,
-      messages: args.messages,
-      temperature: args.temperature || this.openRouterConfig.temperature,
-      max_tokens: args.max_tokens || this.openRouterConfig.maxTokens
-    };
-
-    try {
-      const response = await this.makePostRequest<ChatCompletionResponse>('/chat/completions', request);
-      return this.createSuccessResponse({
-        completion: response.choices[0]?.message?.content,
-        model: response.model,
-        usage: response.usage,
-        finish_reason: response.choices[0]?.finish_reason
-      });
-    } catch (error) {
-      throw this.handleOpenRouterError(error);
-    }
-  }
-
-  private async handleEmbeddings(args: any): Promise<any> {
-    this.validateRequiredParams(args, ['input']);
-    
-    // For embeddings, we'll use the small model if available, otherwise require explicit model
-    let modelToUse = args.model;
-    if (!modelToUse) {
-      if (this.openRouterConfig.models.small) {
-        modelToUse = this.openRouterConfig.models.small;
-      } else {
-        throw new Error('No embedding model configured. Please specify a model or set OPENROUTER_SMALL_MODEL environment variable.');
-      }
-    }
-    
-    const request: EmbeddingRequest = {
-      model: modelToUse,
-      input: args.input
-    };
-
-    try {
-      const response = await this.makePostRequest<EmbeddingResponse>('/embeddings', request);
-      return this.createSuccessResponse({
-        embeddings: response.data[0]?.embedding,
-        model: response.model,
-        usage: response.usage
-      });
-    } catch (error) {
-      throw this.handleOpenRouterError(error);
-    }
-  }
-
-  private async handleListModels(): Promise<any> {
-    try {
-      const response = await this.makeRequest<OpenRouterModelsResponse>('/models');
-      return this.createSuccessResponse({
-        models: response.data.map(model => ({
-          id: model.id,
-          created: model.created,
-          owned_by: model.owned_by,
-          context_length: model.context_length,
-          pricing: model.pricing
-        }))
-      });
-    } catch (error) {
-      throw this.handleOpenRouterError(error);
-    }
-  }
-
-  private async handleGetModelInfo(args: any): Promise<any> {
-    this.validateRequiredParams(args, ['model']);
-    
-    try {
-      const response = await this.makeRequest<ModelInfo>(`/models/${args.model}`);
-      return this.createSuccessResponse({
-        model: response
-      });
-    } catch (error) {
-      throw this.handleOpenRouterError(error);
-    }
-  }
-
-  private async handleGetUsageInfo(): Promise<any> {
-    try {
-      const response = await this.makeRequest<OpenRouterUsageResponse>('/usage');
-      return this.createSuccessResponse({
-        usage: response.data
-      });
-    } catch (error) {
-      throw this.handleOpenRouterError(error);
     }
   }
 
@@ -389,39 +167,427 @@ export class OpenRouterService extends BaseService {
     return await this.handleChatCompletion({ messages });
   }
 
-  private async handleModelSelection(args: any): Promise<any> {
-    const messages: ChatMessage[] = [
-      {
-        role: 'system',
-        content: 'You are an expert in AI model selection. Provide recommendations based on use case and budget constraints.'
-      },
-      {
-        role: 'user',
-        content: `Use case: ${args.use_case}${args.budget ? `\nBudget: ${args.budget}` : ''}\n\nRecommend the best models for this use case.`
+  private async handleChatCompletion(args: any): Promise<any> {
+    this.validateRequiredParams(args, ['messages']);
+    
+    let modelToUse = args.model;
+    if (!modelToUse) {
+      if (this.openRouterConfig.models.small) {
+        modelToUse = this.openRouterConfig.models.small;
+      } else if (this.openRouterConfig.models.large) {
+        modelToUse = this.openRouterConfig.models.large;
+      } else {
+        throw new Error('No model configured. Please set OPENROUTER_SMALL_MODEL or OPENROUTER_LARGE_MODEL environment variable.');
       }
-    ];
+    }
 
-    return await this.handleChatCompletion({ messages });
+    try {
+      const result = await this.openAIClient.chatCompletion(args.messages, {
+        model: modelToUse,
+        temperature: args.temperature || this.openRouterConfig.temperature,
+        maxTokens: args.max_tokens || this.openRouterConfig.maxTokens,
+      });
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to get chat completion');
+      }
+
+      return this.createSuccessResponse({
+        completion: result.data.completion,
+        model: result.data.model,
+        usage: result.data.usage,
+        finish_reason: result.data.finish_reason
+      });
+    } catch (error) {
+      throw this.handleOpenRouterError(error);
+    }
   }
 
-  private async handleUsageOptimization(args: any): Promise<any> {
+  private async handleIntelligentChat(args: any): Promise<any> {
+    this.validateRequiredParams(args, ['conversationId', 'message']);
+    
+    const { conversationId, message, model, temperature } = args;
+    
+    // Get or create conversation context
+    let conversation = this.conversations.get(conversationId);
+    if (!conversation) {
+      conversation = {
+        id: conversationId,
+        messages: [],
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      this.conversations.set(conversationId, conversation);
+    }
+
+    // Add user message to conversation
+    conversation.messages.push({
+      role: 'user',
+      content: message
+    });
+
+    // Step 1: Analyze the user message to identify needed tools
+    const toolAnalysis = await this.analyzeMessageForTools(message);
+    
+    // Step 2: Execute tool calls if needed
+    let toolResults: ToolCallResult[] = [];
+    if (toolAnalysis.tools.length > 0) {
+      toolResults = await this.executeToolCalls(toolAnalysis.tools);
+    }
+
+    // Step 3: Create context-aware system message
+    const systemMessage = this.createSystemMessageWithContext(toolResults);
+    
+    // Step 4: Prepare messages for OpenRouter with tool results context
     const messages: ChatMessage[] = [
-      {
-        role: 'system',
-        content: 'You are an expert in API usage optimization. Provide tips for reducing costs and improving efficiency.'
-      },
-      {
-        role: 'user',
-        content: `Current usage: ${args.current_usage || 'Not specified'}\n\nProvide optimization tips for OpenRouter API usage.`
-      }
+      systemMessage,
+      ...conversation.messages
     ];
 
-    return await this.handleChatCompletion({ messages });
+    // Add tool results context if available
+    if (toolResults.length > 0) {
+      const toolContextMessage = this.createToolResultsContext(toolResults);
+      messages.push(toolContextMessage);
+    }
+
+    // Step 5: Call OpenRouter for response
+    const modelToUse = model || this.openRouterConfig.models.small || this.openRouterConfig.models.large;
+
+    try {
+      const result = await this.openAIClient.chatCompletion(messages, {
+        model: modelToUse,
+        temperature: temperature || this.openRouterConfig.temperature,
+        maxTokens: this.openRouterConfig.maxTokens,
+      });
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to get chat completion');
+      }
+
+      const assistantMessage = result.data.completion || 'I apologize, but I was unable to generate a response.';
+      
+      // Add assistant response to conversation
+      conversation.messages.push({
+        role: 'assistant',
+        content: assistantMessage
+      });
+      conversation.updatedAt = new Date();
+
+      return this.createSuccessResponse({
+        response: assistantMessage,
+        conversationId,
+        toolCalls: toolAnalysis.tools.length > 0 ? toolAnalysis.tools : undefined,
+        toolResults: toolResults.length > 0 ? toolResults : undefined,
+        model: result.data.model,
+        usage: result.data.usage
+      });
+    } catch (error) {
+      throw this.handleOpenRouterError(error);
+    }
+  }
+
+  private async analyzeMessageForTools(message: string): Promise<{tools: ToolCallRequest[], confidence: number}> {
+    const tools: ToolCallRequest[] = [];
+    let totalConfidence = 0;
+    
+    // Get available tools from orchestrator
+    const availableTools = this.getAvailableTools();
+    
+    for (const tool of availableTools) {
+      const toolCall = this.analyzeToolRelevance(tool, message);
+      if (toolCall) {
+        tools.push(toolCall);
+        totalConfidence += toolCall.confidence || 0;
+      }
+    }
+    
+    // Sort by confidence and limit to top 3
+    tools.sort((a, b) => (b.confidence || 0) - (a.confidence || 0));
+    const topTools = tools.slice(0, 3);
+    
+    return {
+      tools: topTools,
+      confidence: topTools.length > 0 ? totalConfidence / topTools.length : 0
+    };
+  }
+
+  private analyzeToolRelevance(tool: ToolDefinition, message: string): ToolCallRequest | null {
+    const messageLower = message.toLowerCase();
+    const toolName = tool.name.toLowerCase();
+    const description = tool.description.toLowerCase();
+    
+    let confidence = 0;
+    const args: Record<string, any> = {};
+    
+    // Check for exact tool name matches
+    if (messageLower.includes(toolName)) {
+      confidence += 0.8;
+    }
+    
+    // Check for description keywords
+    const keywords = this.extractKeywords(description);
+    for (const keyword of keywords) {
+      if (messageLower.includes(keyword)) {
+        confidence += 0.3;
+      }
+    }
+    
+    // Extract specific parameters based on tool type
+    this.extractToolParameters(tool, message, args);
+    
+    // Only return if confidence is high enough
+    if (confidence >= 0.3) {
+      return {
+        name: tool.name,
+        arguments: args,
+        confidence: Math.min(confidence, 1.0),
+        description: `Extracted from: ${message}`
+      };
+    }
+    
+    return null;
+  }
+
+  private extractKeywords(text: string): string[] {
+    const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'can', 'get', 'check', 'find', 'show', 'display', 'list', 'give', 'provide', 'return', 'fetch', 'retrieve']);
+    
+    return text
+      .split(/\s+/)
+      .map(word => word.toLowerCase().replace(/[^\w]/g, ''))
+      .filter(word => word.length > 2 && !stopWords.has(word));
+  }
+
+  private extractToolParameters(tool: ToolDefinition, message: string, args: Record<string, any>): void {
+    const messageLower = message.toLowerCase();
+    const toolName = tool.name.toLowerCase();
+    
+    // Extract wallet addresses
+    const walletMatch = message.match(/0x[a-fA-F0-9]{40}/);
+    if (walletMatch && (toolName.includes('balance') || toolName.includes('wallet') || toolName.includes('portfolio') || toolName.includes('nft'))) {
+      args.walletAddress = walletMatch[0];
+      args.chain = 1; // Default to Ethereum mainnet
+    }
+    
+    // Extract token addresses
+    const tokenMatch = message.match(/0x[a-fA-F0-9]{40}/);
+    if (tokenMatch && (toolName.includes('token') || toolName.includes('price') || toolName.includes('swap'))) {
+      args.tokenAddress = tokenMatch[0];
+      args.chain = 1;
+    }
+    
+    // Extract chain ID
+    const chainMatch = message.match(/chain\s*(?:id\s*)?(\d+)/i);
+    if (chainMatch && chainMatch[1]) {
+      args.chain = parseInt(chainMatch[1]);
+    }
+    
+    // Extract amounts
+    const amountMatch = message.match(/(\d+(?:\.\d+)?)\s*(?:tokens?|coins?|amount|eth|usd)/i);
+    if (amountMatch && amountMatch[1]) {
+      args.amount = amountMatch[1];
+    }
+    
+    // Extract limits
+    const limitMatch = message.match(/limit\s*(\d+)/i);
+    if (limitMatch && limitMatch[1]) {
+      args.limit = parseInt(limitMatch[1]);
+    }
+  }
+
+  private async executeToolCalls(toolCalls: ToolCallRequest[]): Promise<ToolCallResult[]> {
+    const results: ToolCallResult[] = [];
+    
+    for (const toolCall of toolCalls) {
+      try {
+        const startTime = Date.now();
+        
+        // Get orchestrator reference
+        const orchestrator = this.orchestrator;
+        
+        if (orchestrator) {
+          // Validate tool exists
+          const toolInfo = orchestrator.getToolInfo(toolCall.name);
+          if (!toolInfo) {
+            results.push({
+              success: false,
+              toolName: toolCall.name,
+              error: `Tool '${toolCall.name}' not found`,
+              executionTime: 0
+            });
+            continue;
+          }
+
+          // Execute tool call
+          const result = await orchestrator.handleToolCall(toolCall.name, toolCall.arguments);
+          
+          results.push({
+            success: true,
+            toolName: toolCall.name,
+            result: result,
+            executionTime: Date.now() - startTime
+          });
+        } else {
+          results.push({
+            success: false,
+            toolName: toolCall.name,
+            error: 'Orchestrator not available',
+            executionTime: Date.now() - startTime
+          });
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        results.push({
+          success: false,
+          toolName: toolCall.name,
+          error: errorMessage,
+          executionTime: 0
+        });
+        
+        logger.error(`Error executing tool call '${toolCall.name}':`, error);
+      }
+    }
+    
+    return results;
+  }
+
+  private createSystemMessageWithContext(toolResults: ToolCallResult[]): ChatMessage {
+    const successfulResults = toolResults.filter(r => r.success);
+    
+    let systemContent = `You are an intelligent AI assistant with access to blockchain and DeFi tools. You can help users with:
+
+1. **Wallet Analysis**: Check balances, allowances, and portfolio overviews
+2. **Token Information**: Get token details, prices, and market data
+3. **Trading**: Get swap quotes, orderbook data, and trading history
+4. **Market Data**: Access price charts, gas prices, and market trends
+5. **NFTs**: Check NFT balances and collections
+6. **Domain Services**: Resolve domains and get domain information
+
+Always provide helpful, accurate responses with context for the data you retrieve.`;
+
+    if (successfulResults.length > 0) {
+      systemContent += `\n\nI have executed some tools to gather data for you. Use this information to provide a comprehensive response.`;
+    }
+
+    return {
+      role: 'system',
+      content: systemContent
+    };
+  }
+
+  private createToolResultsContext(toolResults: ToolCallResult[]): ChatMessage {
+    const successfulResults = toolResults.filter(r => r.success);
+    const failedResults = toolResults.filter(r => !r.success);
+    
+    let contextContent = '**Tool Execution Results:**\n\n';
+    
+    if (successfulResults.length > 0) {
+      contextContent += '✅ **Successful Tool Calls:**\n';
+      for (const result of successfulResults) {
+        contextContent += `• **${result.toolName}** (${result.executionTime}ms): `;
+        
+        // Add intelligent summary of the result
+        const summary = this.generateResultSummary(result);
+        contextContent += summary + '\n';
+      }
+    }
+    
+    if (failedResults.length > 0) {
+      contextContent += '\n❌ **Failed Tool Calls:**\n';
+      for (const result of failedResults) {
+        contextContent += `• **${result.toolName}**: ${result.error}\n`;
+      }
+    }
+    
+    return {
+      role: 'assistant',
+      content: contextContent
+    };
+  }
+
+  private generateResultSummary(result: ToolCallResult): string {
+    if (!result.result || typeof result.result !== 'object') {
+      return 'Data retrieved';
+    }
+
+    const data = result.result.data || result.result;
+    const toolName = result.toolName.toLowerCase();
+    
+    // Balance-related summaries
+    if (toolName.includes('balance')) {
+      if (Array.isArray(data)) {
+        return `Found ${data.length} token balances`;
+      } else if (data.balances) {
+        const tokenCount = Object.keys(data.balances).length;
+        return `Retrieved ${tokenCount} token balances`;
+      }
+    }
+    
+    // Price-related summaries
+    if (toolName.includes('price') || toolName.includes('spot')) {
+      if (data.price) {
+        return `Current price: $${data.price}`;
+      } else if (data.spotPrice) {
+        return `Spot price: $${data.spotPrice}`;
+      }
+    }
+    
+    // Swap-related summaries
+    if (toolName.includes('swap') || toolName.includes('quote')) {
+      if (data.quote) {
+        return `Swap quote available`;
+      } else if (data.toTokenAmount) {
+        return `Estimated output: ${data.toTokenAmount}`;
+      }
+    }
+    
+    // Token-related summaries
+    if (toolName.includes('token')) {
+      if (data.symbol) {
+        return `Token: ${data.symbol} (${data.name})`;
+      } else if (Array.isArray(data)) {
+        return `Found ${data.length} tokens`;
+      }
+    }
+    
+    // Portfolio-related summaries
+    if (toolName.includes('portfolio')) {
+      if (data.totalValue) {
+        return `Portfolio value: $${data.totalValue}`;
+      } else if (data.holdings) {
+        return `Portfolio holdings retrieved`;
+      }
+    }
+    
+    // Generic summary
+    if (Array.isArray(data)) {
+      return `Retrieved ${data.length} items`;
+    } else if (typeof data === 'object') {
+      const keys = Object.keys(data);
+      if (keys.length > 0) {
+        return `Data retrieved with fields: ${keys.slice(0, 3).join(', ')}${keys.length > 3 ? '...' : ''}`;
+      }
+    }
+    
+    return 'Data retrieved';
+  }
+
+  private getAvailableTools(): ToolDefinition[] {
+    // Get orchestrator reference
+    const orchestrator = this.orchestrator;
+    
+    if (orchestrator) {
+      // Get all tools from orchestrator, excluding OpenRouter tools to avoid circular reference
+      const allTools = orchestrator.getAllTools();
+      return allTools.filter((tool: ToolDefinition) => !tool.name.startsWith('intelligent_chat'));
+    }
+    
+    // Fallback to empty array if orchestrator is not available
+    return [];
   }
 
   private handleOpenRouterError(error: any): Error {
     if (error.response?.data?.error) {
-      const openRouterError = error.response.data as OpenRouterError;
+      const openRouterError = error.response.data;
       return new Error(`OpenRouter API Error: ${openRouterError.error.message} (${openRouterError.error.type})`);
     }
     

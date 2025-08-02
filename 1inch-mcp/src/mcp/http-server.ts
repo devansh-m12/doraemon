@@ -41,6 +41,69 @@ export class OneInchMCPHTTPServer {
       res.json({ status: 'ok', timestamp: new Date().toISOString() });
     });
 
+    // MCP JSON-RPC endpoint
+    this.app.post('/mcp', async (req, res) => {
+      try {
+        const { jsonrpc, id, method, params } = req.body;
+        
+        if (jsonrpc !== '2.0') {
+          return res.status(400).json({
+            jsonrpc: '2.0',
+            error: { code: -32600, message: 'Invalid Request' },
+            id
+          });
+        }
+
+        if (method === 'tools/call') {
+          const { name, arguments: args } = params;
+          const result = await this.orchestrator.handleToolCall(name, args);
+          return res.json({
+            jsonrpc: '2.0',
+            result,
+            id
+          });
+        } else if (method === 'tools/list') {
+          const tools = this.orchestrator.getAllTools();
+          return res.json({
+            jsonrpc: '2.0',
+            result: { tools },
+            id
+          });
+        } else if (method === 'resources/list') {
+          const resources = this.orchestrator.getAllResources();
+          return res.json({
+            jsonrpc: '2.0',
+            result: { resources },
+            id
+          });
+        } else if (method === 'resources/read') {
+          const { uri } = params;
+          const result = await this.orchestrator.handleResourceRead(uri);
+          return res.json({
+            jsonrpc: '2.0',
+            result,
+            id
+          });
+        } else {
+          return res.status(400).json({
+            jsonrpc: '2.0',
+            error: { code: -32601, message: 'Method not found' },
+            id
+          });
+        }
+      } catch (error) {
+        logger.error('Error handling MCP request:', error);
+        return res.status(500).json({
+          jsonrpc: '2.0',
+          error: { 
+            code: -32603, 
+            message: error instanceof Error ? error.message : 'Internal error' 
+          },
+          id: req.body.id
+        });
+      }
+    });
+
     // List available tools
     this.app.get('/tools', async (req, res) => {
       try {
