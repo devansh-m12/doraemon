@@ -1,46 +1,111 @@
 # 1inch MCP Doraemon Client
 
-A modern React-based UI client for interacting with the 1inch Model Context Protocol (MCP) server. This application provides a comprehensive interface for accessing 1inch DEX aggregator APIs through the MCP protocol.
+A comprehensive Model Context Protocol (MCP) client for interacting with 1inch DEX aggregator APIs. This project consists of a modular MCP server and a modern React-based UI client.
 
-## 🏗️ Architecture Overview
-
-### System Components
+## 🏗️ Project Architecture
 
 ```
-┌─────────────────┐    HTTP/JSON-RPC    ┌─────────────────┐    REST API    ┌─────────────────┐
-│   UI Client     │ ◄─────────────────► │   MCP Server    │ ◄────────────► │   1inch APIs    │
-│   (Next.js)     │                     │   (Express)     │                │   (External)     │
-└─────────────────┘                     └─────────────────┘                └─────────────────┘
-        │                                        │
-        │                                        │
-        ▼                                        ▼
-┌─────────────────┐                     ┌─────────────────┐
-│   Chat Server   │                     │ Service Layer   │
-│   (Port 3939)   │                     │ (Orchestrator)  │
-└─────────────────┘                     └─────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                        Doraemon Project                        │
+├─────────────────────────────────────────────────────────────────┤
+│                                                               │
+│  ┌─────────────────┐    HTTP/JSON-RPC    ┌─────────────────┐  │
+│  │   UI Client     │ ◄─────────────────► │   MCP Server    │  │
+│  │   (Next.js)     │                     │   (Express)     │  │
+│  │   Port: 3000    │                     │   Port: 6969    │  │
+│  └─────────────────┘                     └─────────────────┘  │
+│           │                                        │          │
+│           │                                        │          │
+│           ▼                                        ▼          │
+│  ┌─────────────────┐                     ┌─────────────────┐  │
+│  │   Chat Server   │                     │ Service Layer   │  │
+│  │   Port: 3939    │                     │ (Orchestrator)  │  │
+│  └─────────────────┘                     └─────────────────┘  │
+│                                                               │
+│  ┌─────────────────────────────────────────────────────────┐  │
+│  │                1inch APIs (External)                   │  │
+│  │  • Swap API • Token API • Balance API • Gas API       │  │
+│  │  • Portfolio API • Charts API • NFT API • etc.        │  │
+│  └─────────────────────────────────────────────────────────┘  │
+│                                                               │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### Process Flow
+## 📁 Project Structure
 
-1. **UI Client Initialization**
-   - Next.js application starts on port 3000
-   - MCP client connects to HTTP server on port 6969
-   - Health check validates connection
-
-2. **MCP Server Startup**
-   - Express server initializes on port 6969
-   - Service orchestrator loads all 1inch services
-   - CORS enabled for cross-origin requests
-
-3. **Request Flow**
-   ```
-   User Action → UI Component → MCP Client → HTTP Server → Service Orchestrator → 1inch API
-   ```
-
-4. **Response Flow**
-   ```
-   1inch API → Service Orchestrator → HTTP Server → MCP Client → UI Component → User
-   ```
+```
+doraemon/
+├── 1inch-mcp/                    # MCP Server Implementation
+│   ├── src/
+│   │   ├── mcp/
+│   │   │   ├── http-server.ts    # HTTP server for MCP protocol
+│   │   │   └── server.ts         # Standard MCP server
+│   │   ├── services/             # 1inch API service implementations
+│   │   │   ├── base/
+│   │   │   │   └── BaseService.ts # Base service class
+│   │   │   ├── swap/
+│   │   │   ├── token/
+│   │   │   ├── balance/
+│   │   │   ├── gas/
+│   │   │   ├── portfolio/
+│   │   │   ├── charts/
+│   │   │   ├── orderbook/
+│   │   │   ├── spot-price/
+│   │   │   ├── nft/
+│   │   │   ├── transaction-gateway/
+│   │   │   ├── web3-rpc/
+│   │   │   ├── domain/
+│   │   │   ├── intent-swap/
+│   │   │   ├── fusion-plus-swap/
+│   │   │   └── openrouter/
+│   │   ├── config/
+│   │   │   ├── index.ts          # Configuration management
+│   │   │   ├── logger.ts         # Logging configuration
+│   │   │   └── validation.ts     # Environment validation
+│   │   ├── utils/
+│   │   │   └── helpers.ts        # Utility functions
+│   │   ├── index.ts              # Standard MCP server entry
+│   │   └── http-index.ts         # HTTP server entry
+│   ├── tests/                    # Test files
+│   ├── package.json
+│   └── env.example
+├── ui/                           # React UI Client
+│   ├── src/
+│   │   ├── app/                  # Next.js app router
+│   │   │   ├── api/              # API routes
+│   │   │   │   ├── chat/
+│   │   │   │   │   └── route.ts  # Chat API endpoint
+│   │   │   │   ├── health/
+│   │   │   │   │   └── route.ts  # Health check endpoint
+│   │   │   │   └── test/
+│   │   │   │       └── route.ts  # Test API endpoint
+│   │   │   ├── globals.css       # Global styles
+│   │   │   ├── layout.tsx        # Root layout
+│   │   │   └── page.tsx          # Main page
+│   │   ├── components/
+│   │   │   ├── chatbot/          # Chat interface components
+│   │   │   │   ├── ChatContainer.tsx
+│   │   │   │   ├── ChatHeader.tsx
+│   │   │   │   ├── ChatInput.tsx
+│   │   │   │   └── ...
+│   │   │   ├── ui/               # UI components
+│   │   │   │   ├── button.tsx
+│   │   │   │   ├── input.tsx
+│   │   │   │   └── ...
+│   │   │   └── MermaidProvider.tsx
+│   │   ├── lib/
+│   │   │   ├── mcp-client.ts     # MCP client implementation
+│   │   │   ├── chat-storage.ts   # Chat storage utilities
+│   │   │   └── ...
+│   │   └── utils/
+│   ├── public/                   # Static assets
+│   └── package.json
+├── eth-bnb/                      # Ethereum-BNB cross-chain contracts
+├── eth-icp/                      # Ethereum-ICP cross-chain contracts
+├── start-dev.sh                  # Development startup script
+├── stop-dev.sh                   # Development stop script
+└── README.md                     # This file
+```
 
 ## 🚀 Quick Start
 
@@ -53,11 +118,11 @@ A modern React-based UI client for interacting with the 1inch Model Context Prot
 
 ```bash
 # Clone the repository
+git clone https://github.com/devansh-m12/doraemon.git
 cd doraemon
 
-# Install dependencies for both projects
-cd 1inch-mcp && npm install
-cd ../ui && npm install
+# Make startup scripts executable
+chmod +x start-dev.sh stop-dev.sh
 ```
 
 ### 2. Environment Configuration
@@ -90,33 +155,28 @@ NEXT_PUBLIC_CHAT_SERVER_URL=http://localhost:3939
 NEXT_PUBLIC_ENVIRONMENT=development
 ```
 
-### 3. Start the Services
+### 3. Start Development Environment
 
-#### Terminal 1: Start MCP Server
+#### Option A: Automated Startup (Recommended)
 ```bash
-cd 1inch-mcp
+# Start all services automatically
+./start-dev.sh
+```
 
-# Development mode with hot reload
+#### Option B: Manual Startup
+```bash
+# Terminal 1: Start MCP Server
+cd 1inch-mcp
+npm install
 npm run dev:http
 
-# Or production mode
-npm run build
-npm run start:http
-```
-
-#### Terminal 2: Start Chat Server (Optional)
-```bash
+# Terminal 2: Start Chat Server (Optional)
 cd 1inch-mcp
-
-# Start chat server for AI interactions
 npm run dev:chat
-```
 
-#### Terminal 3: Start UI Client
-```bash
+# Terminal 3: Start UI Client
 cd ui
-
-# Development mode
+npm install
 npm run dev
 ```
 
@@ -126,12 +186,9 @@ npm run dev
 - **MCP Server**: http://localhost:6969
 - **Chat Server**: http://localhost:3939
 
-## 🔧 MCP Connection Details
+## 🔧 MCP Connection Flow
 
-### MCP Client Implementation
-
-The UI uses a custom MCP client that communicates with the 1inch MCP server over HTTP:
-
+### 1. UI Client Initialization
 ```typescript
 // ui/src/lib/mcp-client.ts
 export class MCPClient {
@@ -170,19 +227,11 @@ export class MCPClient {
 }
 ```
 
-### MCP Server Implementation
-
-The 1inch MCP server provides HTTP endpoints for MCP protocol:
-
+### 2. MCP Server Request Handling
 ```typescript
 // 1inch-mcp/src/mcp/http-server.ts
 export class OneInchMCPHTTPServer {
   private setupRoutes() {
-    // Health check endpoint
-    this.app.get('/health', (req, res) => {
-      res.json({ status: 'ok', timestamp: new Date().toISOString() });
-    });
-
     // MCP JSON-RPC endpoint
     this.app.post('/mcp', async (req, res) => {
       const { jsonrpc, id, method, params } = req.body;
@@ -199,20 +248,10 @@ export class OneInchMCPHTTPServer {
 }
 ```
 
-### Service Orchestrator
-
-The orchestrator manages all 1inch services and routes requests:
-
+### 3. Service Orchestrator Routing
 ```typescript
 // 1inch-mcp/src/services/ServiceOrchestrator.ts
 export class ServiceOrchestrator {
-  private services: Map<string, BaseService>;
-
-  constructor() {
-    this.services = new Map();
-    this.initializeServices();
-  }
-
   async handleToolCall(name: string, args: any): Promise<any> {
     // Find service that handles this tool
     for (const [serviceName, service] of this.services.entries()) {
@@ -231,9 +270,7 @@ export class ServiceOrchestrator {
 
 ## 📊 Available Services
 
-The MCP server provides access to the following 1inch services:
-
-### Core Services
+### Core DEX Services
 - **Swap Service**: Execute token swaps across multiple DEXes
 - **Token Service**: Search and retrieve token information
 - **Balance Service**: Check token balances across chains
@@ -309,31 +346,6 @@ const getBalance = async (address: string, tokenAddress: string, chainId: number
 | `/chat` | POST | AI chat interface |
 
 ## 🛠️ Development
-
-### Project Structure
-
-```
-doraemon/
-├── 1inch-mcp/                    # MCP Server
-│   ├── src/
-│   │   ├── mcp/
-│   │   │   └── http-server.ts    # HTTP server implementation
-│   │   ├── services/             # 1inch service implementations
-│   │   │   ├── base/
-│   │   │   ├── swap/
-│   │   │   ├── token/
-│   │   │   └── ...               # Other services
-│   │   └── config/               # Configuration management
-│   └── package.json
-├── ui/                           # UI Client
-│   ├── src/
-│   │   ├── app/                  # Next.js app router
-│   │   ├── components/           # React components
-│   │   ├── lib/
-│   │   │   └── mcp-client.ts    # MCP client implementation
-│   │   └── utils/                # Utility functions
-│   └── package.json
-```
 
 ### Adding New Services
 
@@ -473,4 +485,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-Built with ❤️ using Next.js, React 19, and the 1inch MCP server architecture.
+Built with ❤️ using Next.js, React 19, and the 1inch MCP server architecture. 
