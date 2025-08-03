@@ -149,18 +149,54 @@ eth-aptos/
 
 ## 🛠️ Development Status
 
-🔄 **Phase 1**: Project Setup - In Progress  
-⏳ **Phase 2**: Core Dependencies & Types - Pending  
-⏳ **Phase 3**: State Management - Pending  
-⏳ **Phase 4**: Aptos Token Integration - Pending  
-⏳ **Phase 5**: Core Escrow Functions - Pending  
-⏳ **Phase 6**: Order Management - Pending  
-⏳ **Phase 7**: Cancellation & Cleanup - Pending  
-⏳ **Phase 8**: Query Functions - Pending  
-⏳ **Phase 9**: Security & Reentrancy - Pending  
-⏳ **Phase 10**: Testing & Validation - Pending  
-⏳ **Phase 11**: Deployment - Pending  
-⏳ **Phase 12**: Documentation & Final Checks - Pending  
+✅ **Phase 1**: Project Setup - Complete  
+✅ **Phase 2**: Core Dependencies & Types - Complete  
+✅ **Phase 3**: State Management - Complete  
+✅ **Phase 4**: Aptos Token Integration - Complete  
+✅ **Phase 5**: Core Escrow Functions - Complete  
+✅ **Phase 6**: Order Management - Complete  
+✅ **Phase 7**: Cancellation & Cleanup - Complete  
+✅ **Phase 8**: Query Functions - Complete  
+✅ **Phase 9**: Security & Reentrancy - Complete  
+✅ **Phase 10**: Testing & Validation - Complete  
+✅ **Phase 11**: Deployment - Complete  
+🔄 **Phase 12**: Documentation & Final Checks - In Progress  
+
+## 📋 Deployed Contracts
+
+### Testnet Deployment
+
+**Contract Address:** `0xf3b387e70e971c321d06adc2c8a6721d010b2827508deae8cf1a24fa74817ac9`
+
+**Explorer URL:** https://explorer.aptoslabs.com/account/0xf3b387e70e971c321d06adc2c8a6721d010b2827508deae8cf1a24fa74817ac9?network=testnet
+
+**Latest Transaction:** https://explorer.aptoslabs.com/txn/0x792e905a5b424df59d377c2104ef7d4c7f885e0b389d0af4f8404c9246b2e87f?network=testnet
+
+### Contract Status
+- ✅ **Deployed**: Successfully deployed to Aptos testnet
+- ✅ **Verified**: Contract functions working correctly
+- ✅ **Tested**: Order creation and query functions validated
+- 🔄 **Active**: Ready for cross-chain atomic swaps
+
+### Available Functions
+
+#### Entry Functions (Transaction Functions)
+- `create_order` - Create a new swap order
+- `cancel_order` - Cancel an existing order  
+- `fill_order` - Fill an order with the secret
+- `batch_create_orders` - Create multiple orders at once
+- `batch_cancel_orders` - Cancel multiple orders
+- `batch_fill_orders` - Fill multiple orders
+
+#### View Functions (Query Functions)
+- `check_contract_health` - Check contract status
+- `get_contract_statistics` - Get contract statistics
+- `get_active_orders` - Get all active orders
+- `get_order_by_id` - Get specific order details
+- `get_orders_by_maker` - Get orders by maker address
+- `get_orders_by_status` - Get orders by status
+- `calculate_order_statistics` - Get order statistics
+- `get_order_history` - Get order history
 
 ## 🚀 Quick Start
 

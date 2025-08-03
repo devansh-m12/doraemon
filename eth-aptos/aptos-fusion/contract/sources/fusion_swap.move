@@ -85,7 +85,7 @@ module fusion_swap_addr::fusion_swap {
         OrderConfig { id, src_mint, dst_mint, maker, src_amount, min_dst_amount, estimated_dst_amount, expiration_time, fee, auction, hashlock, timelock, status, created_at, updated_at, filled_amount, remaining_amount }
     }
 
-    public fun create_order(
+    public entry fun create_order(
         sender: &signer,
         src_mint: address,
         dst_mint: address,
@@ -93,10 +93,20 @@ module fusion_swap_addr::fusion_swap {
         min_dst_amount: u128,
         estimated_dst_amount: u128,
         expiration_time: u64,
-        fee: FeeConfig,
-        auction: AuctionData,
-        hashlock: HashLock,
-        timelock: TimeLock
+        maker_fee: u64,
+        taker_fee: u64,
+        resolver_fee: u64,
+        platform_fee: u64,
+        start_price: u128,
+        end_price: u128,
+        start_time: u64,
+        duration: u64,
+        min_fill_amount: u128,
+        max_fill_amount: u128,
+        hash: vector<u8>,
+        finality_lock: u64,
+        exclusive_withdraw: u64,
+        cancellation_timeout: u64
     ) acquires FusionSwapGlobal, OrderStore {
         // Reentrancy protection
         set_reentrancy_guard();
@@ -104,6 +114,28 @@ module fusion_swap_addr::fusion_swap {
         // Basic parameter validation
         assert!(src_amount > 0, EINVALID_AMOUNT);
         assert!(min_dst_amount > 0, EINVALID_AMOUNT);
+        
+        // Construct structs from primitive parameters
+        let fee = FeeConfig { maker_fee, taker_fee, resolver_fee, platform_fee };
+        let auction = AuctionData { 
+            start_price, 
+            end_price, 
+            start_time, 
+            duration, 
+            current_price: start_price, 
+            min_fill_amount, 
+            max_fill_amount 
+        };
+        let hashlock = HashLock { 
+            hash, 
+            secret: option::none(), 
+            is_revealed: false 
+        };
+        let timelock = TimeLock { 
+            finality_lock, 
+            exclusive_withdraw, 
+            cancellation_timeout 
+        };
         
         // Enhanced validation
         validate_price(estimated_dst_amount, min_dst_amount);
@@ -145,7 +177,7 @@ module fusion_swap_addr::fusion_swap {
         clear_reentrancy_guard();
     }
 
-    public fun cancel_order(
+    public entry fun cancel_order(
         sender: &signer,
         order_id: u64
     ) acquires FusionSwapGlobal, OrderStore {
@@ -170,7 +202,7 @@ module fusion_swap_addr::fusion_swap {
         clear_reentrancy_guard();
     }
 
-    public fun fill_order(
+    public entry fun fill_order(
         sender: &signer,
         order_id: u64,
         fill_amount: u128,
@@ -345,12 +377,14 @@ module fusion_swap_addr::fusion_swap {
     }
 
     // Order Query & Analytics Functions
-    fun get_order_by_id(order_id: u64): OrderConfig acquires OrderStore {
+    #[view]
+    public fun get_order_by_id(order_id: u64): OrderConfig acquires OrderStore {
         let store = borrow_global<OrderStore>(@fusion_swap_addr);
         *table::borrow(&store.orders, order_id)
     }
 
-    fun get_orders_by_maker(maker: address): vector<u64> acquires OrderStore {
+    #[view]
+    public fun get_orders_by_maker(maker: address): vector<u64> acquires OrderStore {
         let store = borrow_global<OrderStore>(@fusion_swap_addr);
         if (table::contains(&store.orders_by_maker, maker)) {
             *table::borrow(&store.orders_by_maker, maker)
@@ -359,7 +393,8 @@ module fusion_swap_addr::fusion_swap {
         }
     }
 
-    fun get_orders_by_status(status: u8): vector<u64> acquires OrderStore {
+    #[view]
+    public fun get_orders_by_status(status: u8): vector<u64> acquires OrderStore {
         let store = borrow_global<OrderStore>(@fusion_swap_addr);
         if (table::contains(&store.orders_by_status, status)) {
             *table::borrow(&store.orders_by_status, status)
@@ -368,7 +403,8 @@ module fusion_swap_addr::fusion_swap {
         }
     }
 
-    fun calculate_order_statistics(): (u64, u64, u64, u64, u64) acquires OrderStore {
+    #[view]
+    public fun calculate_order_statistics(): (u64, u64, u64, u64, u64) acquires OrderStore {
         let store = borrow_global<OrderStore>(@fusion_swap_addr);
         let active_count = vector::length(&store.active_orders);
         let filled_count = if (table::contains(&store.orders_by_status, ORDER_STATUS_FILLED)) {
@@ -386,7 +422,8 @@ module fusion_swap_addr::fusion_swap {
         (active_count, filled_count, cancelled_count, expired_count, partially_filled_count)
     }
 
-    fun get_order_history(order_id: u64): (u64, u64, u128, u128) acquires OrderStore {
+    #[view]
+    public fun get_order_history(order_id: u64): (u64, u64, u128, u128) acquires OrderStore {
         let store = borrow_global<OrderStore>(@fusion_swap_addr);
         let order = table::borrow(&store.orders, order_id);
         (order.created_at, order.updated_at, order.filled_amount, order.remaining_amount)
@@ -460,32 +497,60 @@ module fusion_swap_addr::fusion_swap {
         secret: vector<u8>,
     }
 
-    public fun batch_create_orders(
+    public entry fun batch_create_orders(
         sender: &signer,
-        orders_data: vector<BatchOrderData>
+        src_tokens: vector<address>,
+        dst_tokens: vector<address>,
+        src_amounts: vector<u128>,
+        dst_amounts: vector<u128>,
+        min_dst_amounts: vector<u128>,
+        max_dst_amounts: vector<u128>,
+        maker_fees: vector<u64>,
+        taker_fees: vector<u64>,
+        resolver_fees: vector<u64>,
+        platform_fees: vector<u64>,
+        start_prices: vector<u128>,
+        end_prices: vector<u128>,
+        start_times: vector<u64>,
+        durations: vector<u64>,
+        min_fill_amounts: vector<u128>,
+        max_fill_amounts: vector<u128>,
+        hashes: vector<vector<u8>>,
+        finality_locks: vector<u64>,
+        exclusive_withdraws: vector<u64>,
+        cancellation_timeouts: vector<u64>
     ) acquires FusionSwapGlobal, OrderStore {
-        let len = vector::length(&orders_data);
+        let len = vector::length(&src_tokens);
         let i = 0;
         while (i < len) {
-            let order_data = vector::borrow(&orders_data, i);
             create_order(
                 sender, 
-                order_data.src_token, 
-                order_data.dst_token, 
-                order_data.src_amount, 
-                order_data.min_dst_amount, 
-                order_data.max_dst_amount, 
+                *vector::borrow(&src_tokens, i), 
+                *vector::borrow(&dst_tokens, i), 
+                *vector::borrow(&src_amounts, i), 
+                *vector::borrow(&min_dst_amounts, i), 
+                *vector::borrow(&max_dst_amounts, i), 
                 0, // expiration_time - TODO: Use actual timestamp
-                order_data.fee, 
-                order_data.auction, 
-                order_data.hashlock, 
-                order_data.timelock
+                *vector::borrow(&maker_fees, i),
+                *vector::borrow(&taker_fees, i),
+                *vector::borrow(&resolver_fees, i),
+                *vector::borrow(&platform_fees, i),
+                *vector::borrow(&start_prices, i),
+                *vector::borrow(&end_prices, i),
+                *vector::borrow(&start_times, i),
+                *vector::borrow(&durations, i),
+                *vector::borrow(&min_fill_amounts, i),
+                *vector::borrow(&max_fill_amounts, i),
+                *vector::borrow(&hashes, i),
+                *vector::borrow(&finality_locks, i),
+                *vector::borrow(&exclusive_withdraws, i),
+                *vector::borrow(&cancellation_timeouts, i)
             );
             i = i + 1;
         };
     }
 
-    public fun batch_cancel_orders(
+    public entry fun batch_cancel_orders(
         sender: &signer,
         order_ids: vector<u64>
     ) acquires FusionSwapGlobal, OrderStore {
@@ -498,15 +563,16 @@ module fusion_swap_addr::fusion_swap {
         };
     }
 
-    public fun batch_fill_orders(
+    public entry fun batch_fill_orders(
         sender: &signer,
-        fill_data: vector<BatchFillData>
+        order_ids: vector<u64>,
+        fill_amounts: vector<u128>,
+        secrets: vector<vector<u8>>
     ) acquires FusionSwapGlobal, OrderStore {
-        let len = vector::length(&fill_data);
+        let len = vector::length(&order_ids);
         let i = 0;
         while (i < len) {
-            let fill_info = vector::borrow(&fill_data, i);
-            fill_order(sender, fill_info.order_id, fill_info.fill_amount, fill_info.secret);
+            fill_order(sender, *vector::borrow(&order_ids, i), *vector::borrow(&fill_amounts, i), *vector::borrow(&secrets, i));
             i = i + 1;
         };
     }
@@ -600,7 +666,8 @@ module fusion_swap_addr::fusion_swap {
         get_orders_by_maker(maker)
     }
 
-    fun get_active_orders(): vector<u64> acquires OrderStore {
+    #[view]
+    public fun get_active_orders(): vector<u64> acquires OrderStore {
         let store = borrow_global<OrderStore>(@fusion_swap_addr);
         store.active_orders
     }
@@ -861,7 +928,8 @@ module fusion_swap_addr::fusion_swap {
         true
     }
 
-    fun check_contract_health(): (bool, u64, u128, u128) acquires FusionSwapGlobal, OrderStore {
+    #[view]
+    public fun check_contract_health(): (bool, u64, u128, u128) acquires FusionSwapGlobal, OrderStore {
         // Check overall contract health
         let global = borrow_global<FusionSwapGlobal>(@fusion_swap_addr);
         let store = borrow_global<OrderStore>(@fusion_swap_addr);
@@ -869,7 +937,8 @@ module fusion_swap_addr::fusion_swap {
         (is_healthy, global.total_orders, global.total_volume, global.total_fees)
     }
 
-    fun get_contract_statistics(): (u64, u128, u128, u64, u64) acquires FusionSwapGlobal, OrderStore {
+    #[view]
+    public fun get_contract_statistics(): (u64, u128, u128, u64, u64) acquires FusionSwapGlobal, OrderStore {
         // Get comprehensive contract statistics
         let global = borrow_global<FusionSwapGlobal>(@fusion_swap_addr);
         let store = borrow_global<OrderStore>(@fusion_swap_addr);
