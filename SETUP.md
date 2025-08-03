@@ -21,7 +21,7 @@ This guide provides step-by-step instructions for setting up the complete 1inch 
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/yourusername/doraemon.git
 cd doraemon
 
 # Verify the structure
@@ -35,8 +35,10 @@ doraemon/
 ├── ui/
 ├── eth-bnb/
 ├── eth-icp/
+├── eth-aptos/
 ├── start-dev.sh
 ├── stop-dev.sh
+├── logo.png
 └── README.md
 ```
 
@@ -79,15 +81,32 @@ ONEINCH_API_KEY=your_1inch_api_key_here
 ONEINCH_BASE_URL=https://api.1inch.dev
 ONEINCH_TIMEOUT=30000
 
-# OpenRouter Configuration (for AI features)
+# Server Configuration
+NODE_ENV=development
+PORT=6969
+LOG_LEVEL=info
+
+# Cache Configuration (optional)
+REDIS_URL=redis://localhost:6379
+CACHE_TTL=300
+CACHE_ENABLED=true
+
+# Rate Limiting
+RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX_REQUESTS=100
+
+# Security
+CORS_ORIGIN=*
+HELMET_ENABLED=true
+
+# OpenRouter Configuration
 OPENROUTER_API_KEY=your_openrouter_api_key_here
 OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
 OPENROUTER_TIMEOUT=60000
-
-# Server Configuration
-MCP_PORT=6969
-NODE_ENV=development
-LOG_LEVEL=debug
+OPENROUTER_SMALL_MODEL=gpt-3.5-turbo
+OPENROUTER_LARGE_MODEL=gpt-4
+OPENROUTER_MAX_TOKENS=4096
+OPENROUTER_TEMPERATURE=0.7
 ```
 
 #### 3.2 UI Client Configuration
@@ -153,6 +172,7 @@ This script will:
 4. Start the chat server on port 3939 (optional)
 5. Start the UI client on port 3000
 6. Verify all services are running
+7. Create a `logs/` directory for service logs
 
 #### Option B: Manual Startup
 
@@ -225,12 +245,23 @@ The UI client runs on port 3000 and connects to the MCP server via HTTP.
 | `ONEINCH_API_KEY` | Your 1inch API key | Required |
 | `ONEINCH_BASE_URL` | 1inch API base URL | https://api.1inch.dev |
 | `ONEINCH_TIMEOUT` | API request timeout | 30000 |
+| `NODE_ENV` | Environment | development |
+| `PORT` | MCP server port | 6969 |
+| `LOG_LEVEL` | Logging level | info |
+| `CACHE_ENABLED` | Enable caching | true |
+| `CACHE_TTL` | Cache TTL in seconds | 300 |
+| `REDIS_URL` | Redis connection URL | redis://localhost:6379 |
+| `RATE_LIMIT_WINDOW_MS` | Rate limit window | 900000 |
+| `RATE_LIMIT_MAX_REQUESTS` | Max requests per window | 100 |
+| `CORS_ORIGIN` | CORS origin | * |
+| `HELMET_ENABLED` | Enable security headers | true |
 | `OPENROUTER_API_KEY` | OpenRouter API key | Optional |
 | `OPENROUTER_BASE_URL` | OpenRouter API URL | https://openrouter.ai/api/v1 |
 | `OPENROUTER_TIMEOUT` | OpenRouter timeout | 60000 |
-| `MCP_PORT` | MCP server port | 6969 |
-| `NODE_ENV` | Environment | development |
-| `LOG_LEVEL` | Logging level | debug |
+| `OPENROUTER_SMALL_MODEL` | Small model name | gpt-3.5-turbo |
+| `OPENROUTER_LARGE_MODEL` | Large model name | gpt-4 |
+| `OPENROUTER_MAX_TOKENS` | Max tokens | 4096 |
+| `OPENROUTER_TEMPERATURE` | Model temperature | 0.7 |
 
 #### UI Client (ui/.env.local)
 
@@ -263,6 +294,8 @@ cd ui && npm run dev
 ```
 
 ### Viewing Logs
+
+The startup script creates a `logs/` directory with service logs:
 
 ```bash
 # View all logs
@@ -341,6 +374,16 @@ NEXT_PUBLIC_ENVIRONMENT=development
 EOF
 ```
 
+#### 5. Logs Directory Issues
+
+```bash
+# Create logs directory if missing
+mkdir -p logs
+
+# Check log files
+ls -la logs/
+```
+
 ### Debug Mode
 
 Enable debug logging for more detailed information:
@@ -375,7 +418,7 @@ After successful setup:
 1. **Explore the UI**: Navigate to http://localhost:3000
 2. **Test MCP Connection**: Check the browser console for connection status
 3. **Try API Calls**: Use the UI to search for tokens or execute swaps
-4. **Review Logs**: Monitor logs for any issues
+4. **Review Logs**: Monitor logs in the `logs/` directory for any issues
 5. **Customize**: Modify the UI or add new services as needed
 
 ## 🤝 Getting Help

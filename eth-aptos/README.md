@@ -147,20 +147,7 @@ eth-aptos/
 └── README.md                    # Project overview
 ```
 
-## 🛠️ Development Status
 
-✅ **Phase 1**: Project Setup - Complete  
-✅ **Phase 2**: Core Dependencies & Types - Complete  
-✅ **Phase 3**: State Management - Complete  
-✅ **Phase 4**: Aptos Token Integration - Complete  
-✅ **Phase 5**: Core Escrow Functions - Complete  
-✅ **Phase 6**: Order Management - Complete  
-✅ **Phase 7**: Cancellation & Cleanup - Complete  
-✅ **Phase 8**: Query Functions - Complete  
-✅ **Phase 9**: Security & Reentrancy - Complete  
-✅ **Phase 10**: Testing & Validation - Complete  
-✅ **Phase 11**: Deployment - Complete  
-🔄 **Phase 12**: Documentation & Final Checks - In Progress  
 
 ## 📋 Deployed Contracts
 
@@ -210,7 +197,7 @@ eth-aptos/
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/devansh-m12/doraemon.git
 cd eth-aptos
 
 # Install dependencies
@@ -362,13 +349,6 @@ This project is licensed under the MIT License - see the [LICENSE](./LICENSE) fi
 - [Aptos Labs](https://aptoslabs.com/) for the Move framework
 - [Ethereum Foundation](https://ethereum.org/) for EVM standards
 - [Cross-chain Community](https://github.com/cosmos/ibc) for protocols
-
-## 📞 Support
-
-- **Documentation**: [docs.eth-aptos.org](https://docs.eth-aptos.org)
-- **Discord**: [Join our community](https://discord.gg/eth-aptos)
-- **Twitter**: [@eth_aptos](https://twitter.com/eth_aptos)
-- **Email**: support@eth-aptos.org
 
 ---
 
