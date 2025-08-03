@@ -55,7 +55,7 @@ Model Context Protocol (MCP) server for 1inch DEX aggregator with modern React-b
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/devansh-m12/doraemon.git
 cd doraemon
 
 # Make scripts executable

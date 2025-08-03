@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { Menu, PenSquare, Zap, Plus, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
+import Image from "next/image";
 
 interface ChatHeaderProps {
   isConnected: boolean;
@@ -35,7 +36,7 @@ export default function ChatHeader({
         <div className="flex items-center gap-3 flex-1">
           <div className="flex items-center gap-3">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/80 shadow-sm dark:from-primary/90 dark:to-primary/70 dark:shadow-primary/20">
-              <Zap className="h-4 w-4 text-primary-foreground" />
+              <Image src="/logo.png" alt="Doraemon" width={32} height={32} />
             </div>
             <div className="flex items-center gap-2">
               <h1 className="text-lg font-semibold text-foreground hidden sm:block dark:text-foreground">Doraemon</h1>

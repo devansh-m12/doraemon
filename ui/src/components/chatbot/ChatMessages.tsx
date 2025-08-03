@@ -31,7 +31,7 @@ export default function ChatMessages({
         <div className="flex items-start space-x-3 max-w-[85%] md:max-w-[75%] min-w-[280px] sm:min-w-[320px]">
           {!isUser && (
             <Avatar className="w-8 h-8 flex-shrink-0">
-              <AvatarImage src="/bot-avatar.png" />
+              <AvatarImage src="/logo.png" />
               <AvatarFallback className="bg-primary text-primary-foreground dark:bg-primary/90 dark:text-primary-foreground">
                 <Bot className="w-4 h-4" />
               </AvatarFallback>
