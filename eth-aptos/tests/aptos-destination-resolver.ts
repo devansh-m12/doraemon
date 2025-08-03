@@ -90,7 +90,7 @@ export class AptosDestinationResolver {
             const fillParams: FillOrderParams = {
                 orderId,
                 fillAmount,
-                secret: createHashlockHash(secret)
+                secret: await createHashlockHash(secret)
             }
 
             // Validate fill parameters
@@ -146,7 +146,7 @@ export class AptosDestinationResolver {
 
             // Parse the order data from the contract response
             // This is a simplified version - actual implementation would parse the contract data
-            return this.parseOrderData(orderData)
+            return await this.parseOrderData(orderData)
         } catch (error) {
             console.error(`[Aptos] Error getting order: ${error}`)
             return null
@@ -238,13 +238,13 @@ export class AptosDestinationResolver {
     /**
      * Create a test order configuration for Aptos
      */
-    createTestOrderConfig(orderId: string, srcAmount: number, dstAmount: number, secret?: string): OrderParams {
+    async createTestOrderConfig(orderId: string, srcAmount: number, dstAmount: number, secret?: string): Promise<OrderParams> {
         const currentTime = Math.floor(Date.now() / 1000).toString()
         
         // Generate secret hash if secret is provided
         let hash: Uint8Array = new Uint8Array(32)
         if (secret) {
-            hash = createHashlockHash(secret)
+            hash = await createHashlockHash(secret)
         }
         
         return {
@@ -296,11 +296,11 @@ export class AptosDestinationResolver {
         return `order_${randomSuffix}`
     }
 
-    private parseOrderData(orderData: any): OrderParams | null {
+    private async parseOrderData(orderData: any): Promise<OrderParams | null> {
         try {
             // This would parse actual contract data structure
             // For testing purposes, return test data
-            return createTestOrderParams('test-secret')
+            return await createTestOrderParams('test-secret')
         } catch (error) {
             console.error(`[Aptos] Error parsing order data: ${error}`)
             return null

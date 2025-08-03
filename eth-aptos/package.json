@@ -7,7 +7,7 @@
     "build": "aptos move build",
     "test": "aptos move test",
     "test:integration": "npm run test && npm run test:e2e",
-    "test:e2e": "jest --testPathPattern=tests/",
+    "test:e2e": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --testPathPattern=tests/",
     "test:security": "npm run test && npm run audit",
     "audit": "npm audit",
     "deploy:local": "aptos move publish --profile local",

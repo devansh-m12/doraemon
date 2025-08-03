@@ -57,14 +57,24 @@ export async function signAndSubmit(payload: any): Promise<string> {
   return pending.hash;
 }
 
-export function createHashlockHash(secret: string): Uint8Array {
-  return Uint8Array.from(Buffer.from(secret, "hex"));
+export async function createHashlockHash(secret: string): Promise<Uint8Array> {
+  const crypto = await import('crypto');
+  const hash = crypto.createHash('sha256').update(secret).digest();
+  return new Uint8Array(hash);
+}
+
+export function secretToBytes(secret: string): Uint8Array {
+  return new Uint8Array(Buffer.from(secret, 'utf8'));
 }
 
 export function generateRandomSecret(): string {
   const array = new Uint8Array(32);
   crypto.getRandomValues(array);
   return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+export function generateSimpleSecret(): string {
+  return "mysecret" + Math.random().toString(36).substring(7);
 }
 
 export function getAccountAddress(): string {
@@ -241,7 +251,7 @@ export async function batchCreateOrders(orders: OrderParams[]): Promise<string> 
 }
 
 // Test Data Generators
-export function createTestOrderParams(secret?: string): OrderParams {
+export async function createTestOrderParams(secret?: string): Promise<OrderParams> {
   const testSecret = secret || generateRandomSecret();
   
   return {
@@ -261,7 +271,7 @@ export function createTestOrderParams(secret?: string): OrderParams {
     duration: "3600",
     minFillAmount: "100000",
     maxFillAmount: "1000000",
-    hash: createHashlockHash(testSecret),
+    hash: await createHashlockHash(testSecret),
     finalityLock: "300",
     exclusiveWithdraw: "600",
     cancellationTimeout: "900"
@@ -272,7 +282,7 @@ export function createTestFillParams(orderId: string, secret: string): FillOrder
   return {
     orderId,
     fillAmount: "500000",
-    secret: createHashlockHash(secret)
+    secret: secretToBytes(secret)
   };
 }
 
@@ -295,7 +305,8 @@ export function validateFillParams(params: FillOrderParams): boolean {
   return (
     params.orderId !== "" &&
     params.fillAmount !== "0" &&
-    params.secret.length === 32
+    params.secret instanceof Uint8Array &&
+    params.secret.length > 0
   );
 }
 
