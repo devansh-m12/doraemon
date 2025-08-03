@@ -4,7 +4,7 @@ version = "1.0.0"
 authors = ["Fusion Swap Team"]
 
 [addresses]
-fusion_swap_addr = "0xf3b387e70e971c321d06adc2c8a6721d010b2827508deae8cf1a24fa74817ac9"
+fusion_swap_addr = "_"
 
 [dependencies]
 AptosFramework = { git = "https://github.com/aptos-labs/aptos-framework.git", rev = "mainnet", subdir = "aptos-framework" }
